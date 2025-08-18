@@ -3,7 +3,7 @@
 MPI_Datatype MPI_particle;
 int register_MPI_Particle(MPI_Datatype *MPI_Particle){
     int blocklengths[NPROPS_PARTICLE] = {1, 1, 3}; 
-    MPI_Datatype array_types[NPROPS_PARTICLE] = {MPI_INT, MPI_INTEGER8, MPI_DOUBLE};
+    MPI_Datatype array_types[NPROPS_PARTICLE] = {MPI_INT, MPI_INTEGER, MPI_DOUBLE};
     t_particle dummy_particle[2];
     MPI_Aint address[NPROPS_PARTICLE + 1];
     MPI_Aint displacements[NPROPS_PARTICLE];
