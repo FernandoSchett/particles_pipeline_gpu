@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.22)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++20 -g")
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+
 project(P_SFC VERSION 0.0.1 LANGUAGES CXX)
 
 find_package(MPI REQUIRED CXX)
