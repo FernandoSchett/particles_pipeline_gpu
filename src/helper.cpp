@@ -294,3 +294,11 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
     free(recv_disp);
     return 0;
 }
+
+
+void print_particles(t_particle *particle_array, int size, int rank) {        
+    for (int i = 0; i < size; i++){ 
+        printf("P_rank: %d, %d, %f, %f, %f, %ld, %d\n", rank, particle_array[i].mpi_rank, particle_array[i].coord[0], \
+            particle_array[i].coord[1], particle_array[i].coord[2], particle_array[i].key, particle_array[i].quad); 
+    }
+}

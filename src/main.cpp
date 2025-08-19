@@ -10,14 +10,6 @@
 #include "./helper.hpp"
 
 
-
-void print_particles(t_particle *rank_array, int length_per_rank, int rank) {        
-    for (int i = 0; i < length_per_rank; i++){ 
-        printf("P_rank: %d, %d, %f, %f, %f, %ld, %d\n", rank, rank_array[i].mpi_rank, rank_array[i].coord[0], \
-            rank_array[i].coord[1], rank_array[i].coord[2], rank_array[i].key, rank_array[i].quad); 
-    }
-}
-
 int main(int argc, char **argv){
     int rank, nprocs, i;
     int length_per_rank, total_length, total_particles;
@@ -30,7 +22,7 @@ int main(int argc, char **argv){
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    
+
     // You can now use MPI_particle as an input to MPI_Datatype during MPI calls.
     register_MPI_Particle(&MPI_particle);
     
