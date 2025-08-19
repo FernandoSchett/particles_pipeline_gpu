@@ -13,6 +13,7 @@ int main(int argc, char **argv){
     int length_per_rank, total_length;
     int *length_vector, *disp;
     double box_length;
+
     t_particle *rank_array, *receive_array;
     char filename[128] = "particle_file";
     char filename2[128] = "serial_particle_file";
@@ -32,13 +33,17 @@ int main(int argc, char **argv){
 
     allocate_particle(&rank_array, length_per_rank);
     box_distribution(&rank_array, length_per_rank, box_length);
+    generate_particles_keys(&rank_array, length_per_rank, box_length);
 
-/*
+
     for (int i = 0; i < length_per_rank; i++){
-        printf("P_rank: %d, %d, %f, %f, %f\n", rank, rank_array[i].mpi_rank, rank_array[i].coord[0], \
-			rank_array[i].coord[1], rank_array[i].coord[2]);
+        printf("P_rank: %d, %d, %f, %f, %f, %ld\n", rank, rank_array[i].mpi_rank, rank_array[i].coord[0], \
+			rank_array[i].coord[1], rank_array[i].coord[2], rank_array[i].key);
+            
+        rank_array[i].key = 0;
+
     }
-*/
+
 
     parallel_write_to_file(rank_array, length_vector, filename);
 

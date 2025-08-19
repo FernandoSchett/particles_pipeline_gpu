@@ -2,6 +2,7 @@
 #define HELPER_H
 
 #include <cstring>
+#include <stdlib.h> 
 #include <fstream>
 #include <mpi.h>
 #include <Random123/philox.h>
@@ -14,6 +15,7 @@ typedef struct particle{
 } t_particle;
 
 #define NPROPS_PARTICLE 3
+#define MAX_DEPTH 10
 
 extern MPI_Datatype MPI_particle;
 extern int register_MPI_Particle(MPI_Datatype *MPI_Particle);
@@ -22,5 +24,7 @@ int box_distribution(t_particle **particle_array, int count, double box_length);
 int parallel_write_to_file(t_particle *particle_array, int *count, char *filename);
 int serial_write_to_file(t_particle *particle_array, int count, char *filename);
 int serial_read_from_file(t_particle **particle_array, int *count, char *filename);
+int generate_particles_keys(t_particle **particle_array, int count, double box_length);
+void run_oct_tree_recursive(t_particle **particles, int count, int depth, long long key_prefix);
 
 #endif

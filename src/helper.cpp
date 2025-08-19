@@ -3,7 +3,7 @@
 MPI_Datatype MPI_particle;
 int register_MPI_Particle(MPI_Datatype *MPI_Particle){
     int blocklengths[NPROPS_PARTICLE] = {1, 1, 3}; 
-    MPI_Datatype array_types[NPROPS_PARTICLE] = {MPI_INT, MPI_INTEGER, MPI_DOUBLE};
+    MPI_Datatype array_types[NPROPS_PARTICLE] = {MPI_INT, MPI_LONG_LONG, MPI_DOUBLE};
     t_particle dummy_particle[2];
     MPI_Aint address[NPROPS_PARTICLE + 1];
     MPI_Aint displacements[NPROPS_PARTICLE];
@@ -62,20 +62,20 @@ int box_distribution(t_particle **particle_array, int count, double box_length){
     c[1] = 31106712;
 
     for (int i = 0; i < count; i++){
-	c[0] += 1;
+        c[0] += 1;
         c[1] += 1;
         r = rng(c, k);
-	(*particle_array)[i].coord[0] = r123::u01<double>(r.v[0])*box_length;
+        (*particle_array)[i].coord[0] = r123::u01<double>(r.v[0])*box_length;
 
-	c[0] += 1;
+        c[0] += 1;
         c[1] += 1;
         r = rng(c, k);
-	(*particle_array)[i].coord[1] = r123::u01<double>(r.v[0])*box_length;
+        (*particle_array)[i].coord[1] = r123::u01<double>(r.v[0])*box_length;
 
-	c[0] += 1;
+        c[0] += 1;
         c[1] += 1;
         r = rng(c, k);
-	(*particle_array)[i].coord[2] = r123::u01<double>(r.v[0])*box_length;
+        (*particle_array)[i].coord[2] = r123::u01<double>(r.v[0])*box_length;
     }
     return 0;
 }
@@ -161,17 +161,75 @@ int serial_read_from_file(t_particle **particle_array, int *count, char *filenam
 
         file.read(bytes, 8);
         std::memcpy(&temp_coords, bytes, 8);
-	(*particle_array)[i].coord[0] = temp_coords;
+        (*particle_array)[i].coord[0] = temp_coords;
 
-        file.read(bytes, 8);
-        std::memcpy(&temp_coords, bytes, 8);
-	(*particle_array)[i].coord[1] = temp_coords;
-        
-        file.read(bytes, 8);
-        std::memcpy(&temp_coords, bytes, 8);
-	(*particle_array)[i].coord[2] = temp_coords;
+            file.read(bytes, 8);
+            std::memcpy(&temp_coords, bytes, 8);
+        (*particle_array)[i].coord[1] = temp_coords;
+            
+            file.read(bytes, 8);
+            std::memcpy(&temp_coords, bytes, 8);
+        (*particle_array)[i].coord[2] = temp_coords;
     }	
 
     file.close();
+    return 0;
+}
+
+void run_oct_tree_recursive(t_particle **particles, int count, int depth, long long key_prefix) {
+    if (depth >= MAX_DEPTH) {
+        printf("MAX_DEPTH SUBDIVISIONS WERE NOT ENOUGH FOR THIS PARTICLES SET.\n");
+    }
+
+    if (count == 0) return;
+
+    if (count == 1) {
+        long long final_key = key_prefix;
+        int remaining_depth = MAX_DEPTH - depth;
+        final_key <<= (3 * remaining_depth); 
+        particles[0]->key = final_key;
+        return;
+    }
+
+    t_particle **octants[8];
+    int oct_count[8] = {0};
+
+    for (int i = 0; i < 8; i++) {
+        octants[i] = (t_particle **)malloc(count * sizeof(t_particle *));
+    }
+
+    for (int i = 0; i < count; i++) {
+        int oct = 0;
+        if (particles[i]->coord[0] >= 0.5) oct |= 1;
+        if (particles[i]->coord[1] >= 0.5) oct |= 2;
+        if (particles[i]->coord[2] >= 0.5) oct |= 4;
+        octants[oct][oct_count[oct]++] = particles[i];
+    }
+
+    for (int i = 0; i < 8; i++) {
+        for (int j = 0; j < oct_count[i]; j++) {
+            if (i & 1) octants[i][j]->coord[0] = (octants[i][j]->coord[0] - 0.5) * 2;
+            else       octants[i][j]->coord[0] *= 2;
+            if (i & 2) octants[i][j]->coord[1] = (octants[i][j]->coord[1] - 0.5) * 2;
+            else       octants[i][j]->coord[1] *= 2;
+            if (i & 4) octants[i][j]->coord[2] = (octants[i][j]->coord[2] - 0.5) * 2;
+            else       octants[i][j]->coord[2] *= 2;
+        }
+    }
+
+    for (int i = 0; i < 8; i++) {
+        if (oct_count[i] > 0) {
+            long long new_key = (key_prefix << 3) | i;
+            run_oct_tree_recursive(octants[i], oct_count[i], depth + 1, new_key);
+        }
+    }
+
+
+    for (int i = 0; i < 8; i++) free(octants[i]);
+}
+
+int generate_particles_keys(t_particle **particle_array, int count, double box_length){
+    long long key_prefix = 0;
+    run_oct_tree_recursive(particle_array, count, 0, key_prefix);
     return 0;
 }
