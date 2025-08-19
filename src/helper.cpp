@@ -177,11 +177,14 @@ int serial_read_from_file(t_particle **particle_array, int *count, char *filenam
 }
 
 void run_oct_tree_recursive(t_particle **particles, int count, int depth, long long key_prefix) {
+    printf("Chamada: %d %d %lld \n", count, depth, key_prefix);
+    
     if (depth >= MAX_DEPTH) {
         printf("MAX_DEPTH SUBDIVISIONS WERE NOT ENOUGH FOR THIS PARTICLES SET.\n");
         exit(0);
     }
 
+ 
     if (count == 0) return;
 
     if (count == 1) {
@@ -203,11 +206,13 @@ void run_oct_tree_recursive(t_particle **particles, int count, int depth, long l
     }
 
     for (int i = 0; i < count; i++) {
+        
         int oct = 0;
-        if (particles[i]->coord[0] >= 0.5) oct |= 1;
-        if (particles[i]->coord[1] >= 0.5) oct |= 2;
-        if (particles[i]->coord[2] >= 0.5) oct |= 4;
-        octants[oct][oct_count[oct]++] = particles[i];
+        if ((*particles)[i].coord[0] >= 0.5) oct |= 1;
+        if ((*particles)[i].coord[1] >= 0.5) oct |= 2;
+        if ((*particles)[i].coord[2] >= 0.5) oct |= 4;
+        octants[oct][oct_count[oct]] = *particles + sizeof(t_particle);
+        oct_count[oct]++;
     }
 
     for (int i = 0; i < 8; i++) {
@@ -222,6 +227,8 @@ void run_oct_tree_recursive(t_particle **particles, int count, int depth, long l
     }
 
     for (int i = 0; i < 8; i++) {
+        printf("Chamada REC: %d %d %lld \n", count, depth, key_prefix);
+
         if (oct_count[i] > 0) {
             long long new_key = (key_prefix << 3) | i;
             run_oct_tree_recursive(octants[i], oct_count[i], depth + 1, new_key);
@@ -278,7 +285,6 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
     *particles = recv_buffer;
     *particle_vector_size = total_recv;
 
-    
     free(send_counts);
     free(send_disp);
     free(recv_counts);
