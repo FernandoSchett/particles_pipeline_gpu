@@ -1,0 +1,15 @@
+#!/bin/bash
+
+cd "$(dirname "$0")/.."
+
+rm -rf build
+
+mkdir build 
+
+cd build 
+
+cmake .. 
+
+cmake --build .
+
+mpirun -np 4 ./p_sfc_exe 
