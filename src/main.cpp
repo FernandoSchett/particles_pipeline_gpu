@@ -13,7 +13,7 @@
 
 void print_particles(t_particle *rank_array, int length_per_rank, int rank) {        
     for (int i = 0; i < length_per_rank; i++){ 
-        printf("P_rank: %d, %d, %f, %f, %f, %ld, %d\n", rank, rank_array[i].mpi_rank, rank_array[i].coord[0], \ 
+        printf("P_rank: %d, %d, %f, %f, %f, %ld, %d\n", rank, rank_array[i].mpi_rank, rank_array[i].coord[0], \
             rank_array[i].coord[1], rank_array[i].coord[2], rank_array[i].key, rank_array[i].quad); 
     }
 }
@@ -23,7 +23,6 @@ int main(int argc, char **argv){
     int length_per_rank, total_length, total_particles;
     int *length_vector, *disp;
     double box_length;
-
     t_particle *rank_array, *receive_array;
     char filename[128] = "particle_file";
     char filename2[128] = "serial_particle_file";
@@ -31,16 +30,21 @@ int main(int argc, char **argv){
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
     register_MPI_Particle(&MPI_particle);
-    // You can now use MPI_particle as an input to MPI_Datatype during MPI calls.
-
+    
+    
     length_per_rank = (rank+1)*100;
     box_length = 100;
-
     length_vector = (int *)malloc(nprocs*sizeof(int));
-
     MPI_Allgather(&length_per_rank, 1, MPI_INT, length_vector, 1, MPI_INT, MPI_COMM_WORLD);
+    total_length = 0;
+    for (i = 0; i < nprocs; i++)
+        total_length += length_vector[i];
+    
+    // You can now use MPI_particle as an input to MPI_Datatype during MPI calls.
+    
+    
+
     allocate_particle(&rank_array, length_per_rank);
     box_distribution(&rank_array, length_per_rank, box_length);
     //generate_particles_keys(&rank_array, length_per_rank, box_length);
@@ -50,9 +54,10 @@ int main(int argc, char **argv){
 
     // Distribute Particles
     distribute_particles(&rank_array, &length_per_rank, nprocs);
-    
+    MPI_Allgather(&length_per_rank, 1, MPI_INT, length_vector, 1, MPI_INT, MPI_COMM_WORLD);
 
     parallel_write_to_file(rank_array, length_vector, filename);
+
     receive_array = (t_particle *)malloc(total_length*sizeof(t_particle));
     disp = (int *)malloc(nprocs*sizeof(int));
     disp[0] = 0;

@@ -42,4 +42,4 @@ ax.set_zlabel('Z')
 
 fig.colorbar(p)
 
-plt.show()
+plt.savefig("output.png")

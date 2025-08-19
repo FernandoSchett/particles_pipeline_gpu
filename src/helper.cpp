@@ -278,8 +278,10 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
     *particles = recv_buffer;
     *particle_vector_size = total_recv;
 
+    
     free(send_counts);
     free(send_disp);
     free(recv_counts);
     free(recv_disp);
+    return 0;
 }
