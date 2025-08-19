@@ -5,12 +5,24 @@
 #include <cmath>
 #include <time.h>
 #include <iostream>
+#include <algorithm> 
 
 #include "./helper.hpp"
 
+bool compare_particles(const t_particle &a, const t_particle &b) {
+    return a.key > b.key;
+}
+
+void print_particles(t_particle *rank_array, int length_per_rank, int rank) {        
+    for (int i = 0; i < length_per_rank; i++){ 
+        printf("P_rank: %d, %d, %f, %f, %f, %ld\n", rank, rank_array[i].mpi_rank, rank_array[i].coord[0], \ 
+            rank_array[i].coord[1], rank_array[i].coord[2], rank_array[i].key); 
+    }
+}
+
 int main(int argc, char **argv){
     int rank, nprocs, i;
-    int length_per_rank, total_length;
+    int length_per_rank, total_length, total_particles;
     int *length_vector, *disp;
     double box_length;
 
@@ -29,29 +41,23 @@ int main(int argc, char **argv){
     box_length = 100;
 
     length_vector = (int *)malloc(nprocs*sizeof(int));
-    MPI_Allgather(&length_per_rank, 1, MPI_INT, length_vector, 1, MPI_INT, MPI_COMM_WORLD);
 
+    MPI_Allgather(&length_per_rank, 1, MPI_INT, length_vector, 1, MPI_INT, MPI_COMM_WORLD);
     allocate_particle(&rank_array, length_per_rank);
     box_distribution(&rank_array, length_per_rank, box_length);
-    generate_particles_keys(&rank_array, length_per_rank, box_length);
+    //generate_particles_keys(&rank_array, length_per_rank, box_length);
+    std::sort(rank_array, rank_array + length_per_rank, compare_particles);
 
+    print_particles(rank_array, length_per_rank, rank);
 
-    for (int i = 0; i < length_per_rank; i++){
-        printf("P_rank: %d, %d, %f, %f, %f, %ld\n", rank, rank_array[i].mpi_rank, rank_array[i].coord[0], \
-			rank_array[i].coord[1], rank_array[i].coord[2], rank_array[i].key);
-            
-        rank_array[i].key = 0;
+    // Distribute Particles
+    total_particles = 0;
+    for (int i = 0; i < nprocs; i++)
+        total_particles += (i+1)*100;
 
-    }
 
 
     parallel_write_to_file(rank_array, length_vector, filename);
-
-    total_length = 0;
-    for (i = 0; i < nprocs; i++){
-        total_length += length_vector[i];
-    }
-
     receive_array = (t_particle *)malloc(total_length*sizeof(t_particle));
     disp = (int *)malloc(nprocs*sizeof(int));
     disp[0] = 0;
@@ -70,10 +76,6 @@ int main(int argc, char **argv){
     total_length = 0;
     if (rank == 0){
         serial_read_from_file(&rank_array, &total_length, filename);
-        /* for (int i = 0; i < total_length; i++){
-            printf("Q_rank: %d, %d, %f, %f, %f\n", rank, rank_array[i].mpi_rank, rank_array[i].coord[0], \
-	    		rank_array[i].coord[1], rank_array[i].coord[2]);
-        }*/
         free(rank_array);
     }
 
