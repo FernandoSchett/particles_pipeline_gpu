@@ -176,18 +176,8 @@ int serial_read_from_file(t_particle **particle_array, int *count, char *filenam
     return 0;
 }
 
-void run_oct_tree_recursive(t_particle **particles, int count, int depth, long long key_prefix) {
+void run_oct_tree_recursive(t_particle **particles, int count, int depth, long long key_prefix, double box_length) {
     printf("Chamada: %d %d %lld \n", count, depth, key_prefix);
-    
-    if (depth >= MAX_DEPTH) {
-        for (int i = 0 ; i < count ;i++){
-            printf("PARTICLES: %f %f %f\n", (*particles)[i].coord[0], (*particles)[i].coord[1], (*particles)[i].coord[2]);
-        }
-        printf("MAX_DEPTH SUBDIVISIONS WERE NOT ENOUGH FOR THIS PARTICLES SET.\n");
-        exit(0);
-    }
-
- 
     if (count == 0) return;
 
     if (count == 1) {
@@ -199,7 +189,17 @@ void run_oct_tree_recursive(t_particle **particles, int count, int depth, long l
         // gets msb
         particles[0]->quad = ( particles[0]->key >> (3 * MAX_DEPTH - 3)) & 0b111;
         return;
+    }    
+
+    if (depth > MAX_DEPTH) {
+        for (int i = 0 ; i < count ;i++){
+            printf("PARTICLES: %f %f %f %d\n", (*particles)[i].coord[0], (*particles)[i].coord[1], (*particles)[i].coord[2], (*particles)[i].mpi_rank);
+        }
+        printf("MAX_DEPTH SUBDIVISIONS WERE NOT ENOUGH FOR THIS PARTICLES SET.\n");
+        exit(0);
     }
+
+
 
     t_particle **octants[8];
     int oct_count[8] = {0};
@@ -209,23 +209,25 @@ void run_oct_tree_recursive(t_particle **particles, int count, int depth, long l
     }
 
     for (int i = 0; i < count; i++) {
-        
         int oct = 0;
-        if ((*particles)[i].coord[0] >= 0.5) oct |= 1;
-        if ((*particles)[i].coord[1] >= 0.5) oct |= 2;
-        if ((*particles)[i].coord[2] >= 0.5) oct |= 4;
+        if ((*particles)[i].coord[0] >= box_length / 2) oct |= 1;
+        if ((*particles)[i].coord[1] >= box_length / 2) oct |= 2;
+        if ((*particles)[i].coord[2] >= box_length / 2) oct |= 4;
         octants[oct][oct_count[oct]] = &(*particles)[i];
         oct_count[oct]++;
     }
 
     for (int i = 0; i < 8; i++) {
+        double half = box_length / 2.0;
         for (int j = 0; j < oct_count[i]; j++) {
-            if (i & 1) octants[i][j]->coord[0] = (octants[i][j]->coord[0] - 0.5) * 2;
-            else       octants[i][j]->coord[0] *= 2;
-            if (i & 2) octants[i][j]->coord[1] = (octants[i][j]->coord[1] - 0.5) * 2;
-            else       octants[i][j]->coord[1] *= 2;
-            if (i & 4) octants[i][j]->coord[2] = (octants[i][j]->coord[2] - 0.5) * 2;
-            else       octants[i][j]->coord[2] *= 2;
+            if (i & 1) octants[i][j]->coord[0] = (octants[i][j]->coord[0] - half);
+            else       octants[i][j]->coord[0] = octants[i][j]->coord[0];
+
+            if (i & 2) octants[i][j]->coord[1] = (octants[i][j]->coord[1] - half);
+            else       octants[i][j]->coord[1] = octants[i][j]->coord[1];
+
+            if (i & 4) octants[i][j]->coord[2] = (octants[i][j]->coord[2] - half);
+            else       octants[i][j]->coord[2] = octants[i][j]->coord[2];
         }
     }
 
@@ -234,19 +236,19 @@ void run_oct_tree_recursive(t_particle **particles, int count, int depth, long l
 
         if (oct_count[i] > 0) {
             long long new_key = (key_prefix << 3) | i;
-            run_oct_tree_recursive(octants[i], oct_count[i], depth + 1, new_key);
+            run_oct_tree_recursive(octants[i], oct_count[i], depth + 1, new_key, box_length / 2.0);
         }
     }
-
 
     for (int i = 0; i < 8; i++) free(octants[i]);
 }
 
 int generate_particles_keys(t_particle **particle_array, int count, double box_length){
     long long key_prefix = 0;
-    run_oct_tree_recursive(particle_array, count, 0, key_prefix);
+    run_oct_tree_recursive(particle_array, count, 0, key_prefix, box_length);
     return 0;
 }
+
 
 
 bool compare_particles(const t_particle &a, const t_particle &b) {
