@@ -30,6 +30,8 @@ int main(int argc, char **argv){
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    
+    // You can now use MPI_particle as an input to MPI_Datatype during MPI calls.
     register_MPI_Particle(&MPI_particle);
     
     
@@ -37,11 +39,11 @@ int main(int argc, char **argv){
     box_length = 100;
     length_vector = (int *)malloc(nprocs*sizeof(int));
     MPI_Allgather(&length_per_rank, 1, MPI_INT, length_vector, 1, MPI_INT, MPI_COMM_WORLD);
+
     total_length = 0;
     for (i = 0; i < nprocs; i++)
         total_length += length_vector[i];
     
-    // You can now use MPI_particle as an input to MPI_Datatype during MPI calls.
     
     
 

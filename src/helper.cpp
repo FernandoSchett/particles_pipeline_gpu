@@ -54,7 +54,7 @@ int box_distribution(t_particle **particle_array, int count, double box_length){
     RNG rng;
     RNG::ctr_type c={{}};
     RNG::ukey_type uk={{}};
-    uk[0] = p_rank; // some user_supplied_seed
+    uk[0] = p_rank+27; // some user_supplied_seed
     RNG::key_type k=uk;
     RNG::ctr_type r;
 
@@ -180,6 +180,9 @@ void run_oct_tree_recursive(t_particle **particles, int count, int depth, long l
     printf("Chamada: %d %d %lld \n", count, depth, key_prefix);
     
     if (depth >= MAX_DEPTH) {
+        for (int i = 0 ; i < count ;i++){
+            printf("PARTICLES: %f %f %f\n", (*particles)[i].coord[0], (*particles)[i].coord[1], (*particles)[i].coord[2]);
+        }
         printf("MAX_DEPTH SUBDIVISIONS WERE NOT ENOUGH FOR THIS PARTICLES SET.\n");
         exit(0);
     }
@@ -211,7 +214,7 @@ void run_oct_tree_recursive(t_particle **particles, int count, int depth, long l
         if ((*particles)[i].coord[0] >= 0.5) oct |= 1;
         if ((*particles)[i].coord[1] >= 0.5) oct |= 2;
         if ((*particles)[i].coord[2] >= 0.5) oct |= 4;
-        octants[oct][oct_count[oct]] = *particles + sizeof(t_particle);
+        octants[oct][oct_count[oct]] = &(*particles)[i];
         oct_count[oct]++;
     }
 
