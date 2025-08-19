@@ -179,6 +179,7 @@ int serial_read_from_file(t_particle **particle_array, int *count, char *filenam
 void run_oct_tree_recursive(t_particle **particles, int count, int depth, long long key_prefix) {
     if (depth >= MAX_DEPTH) {
         printf("MAX_DEPTH SUBDIVISIONS WERE NOT ENOUGH FOR THIS PARTICLES SET.\n");
+        exit(0);
     }
 
     if (count == 0) return;
@@ -188,6 +189,9 @@ void run_oct_tree_recursive(t_particle **particles, int count, int depth, long l
         int remaining_depth = MAX_DEPTH - depth;
         final_key <<= (3 * remaining_depth); 
         particles[0]->key = final_key;
+
+        // gets msb
+        particles[0]->quad = ( particles[0]->key >> (3 * MAX_DEPTH - 3)) & 0b111;
         return;
     }
 
@@ -232,4 +236,50 @@ int generate_particles_keys(t_particle **particle_array, int count, double box_l
     long long key_prefix = 0;
     run_oct_tree_recursive(particle_array, count, 0, key_prefix);
     return 0;
+}
+
+
+bool compare_particles(const t_particle &a, const t_particle &b) {
+    return a.quad > b.quad;
+}
+
+int distribute_particles(t_particle **particles, int *particle_vector_size, int nprocs){
+    std::sort(*particles, *particles + *particle_vector_size, compare_particles);
+
+    int *send_counts = (int*)calloc(nprocs, sizeof(int));
+    for (int i = 0; i < *particle_vector_size; i++){
+        int dest = (*particles)[i].quad;  
+        send_counts[dest]++;
+    }
+
+    int *send_disp = (int*)malloc(nprocs * sizeof(int));
+    send_disp[0] = 0;
+    for (int i = 1; i < nprocs; i++)
+        send_disp[i] = send_disp[i-1] + send_counts[i-1];
+
+    int *recv_counts = (int*)malloc(nprocs * sizeof(int));
+    MPI_Alltoall(send_counts, 1, MPI_INT, recv_counts, 1, MPI_INT, MPI_COMM_WORLD);
+
+    int total_recv = 0;
+    int *recv_disp = (int*)malloc(nprocs * sizeof(int));
+    recv_disp[0] = 0;
+    for (int i = 0; i < nprocs; i++){
+        if (i > 0) recv_disp[i] = recv_disp[i-1] + recv_counts[i-1];
+        total_recv += recv_counts[i];
+    }
+
+    t_particle *recv_buffer = (t_particle*)malloc(total_recv * sizeof(t_particle));
+
+    MPI_Alltoallv(*particles, send_counts, send_disp, MPI_particle,
+                  recv_buffer, recv_counts, recv_disp, MPI_particle,
+                  MPI_COMM_WORLD);
+
+    free(*particles);
+    *particles = recv_buffer;
+    *particle_vector_size = total_recv;
+
+    free(send_counts);
+    free(send_disp);
+    free(recv_counts);
+    free(recv_disp);
 }

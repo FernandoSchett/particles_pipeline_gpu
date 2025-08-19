@@ -11,6 +11,7 @@
 typedef struct particle{
     int mpi_rank;
     long long int key;
+    int quad;
     double coord[3];
 } t_particle;
 
@@ -26,5 +27,6 @@ int serial_write_to_file(t_particle *particle_array, int count, char *filename);
 int serial_read_from_file(t_particle **particle_array, int *count, char *filename);
 int generate_particles_keys(t_particle **particle_array, int count, double box_length);
 void run_oct_tree_recursive(t_particle **particles, int count, int depth, long long key_prefix);
+int distribute_particles(t_particle **particles, int* particle_vector_size, int nprocs);
 
 #endif
