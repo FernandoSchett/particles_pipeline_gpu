@@ -265,7 +265,8 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
     }
 
     for (int i = 0; i < *particle_vector_size; i++){
-        dest = ((*particles)[i].key >> (3 * MAX_DEPTH - bits_needed)) % nprocs;   
+        dest = ((*particles)[i].key >> (3 * MAX_DEPTH - bits_needed)) % nprocs;
+        //printf("Dest: %d\n", dest);   
         send_counts[dest]++;
     }
 
@@ -293,8 +294,8 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
     
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    printf("Rank %d, Number Particles: %d\n", rank, total_recv);
     for(int i = 0; i < total_recv; i++){
-        if(rank != 0)
         recv_buffer[i].mpi_rank = rank;  
     }
                   
