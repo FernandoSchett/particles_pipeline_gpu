@@ -178,79 +178,81 @@ int serial_read_from_file(t_particle **particle_array, int *count, char *filenam
     return 0;
 }
 
-void run_oct_tree_recursive( t_particle **particles, int count, int depth, long long key_prefix, double box_length, double origin[3]){
-    printf("ORIGIN: %f %f %f\n", origin[0],  origin[1], origin[2]);
-    printf("Call: %d %d %lld \n", count, depth, key_prefix);
-    
-    if (count == 0) return;
+void run_oct_tree_recursive(std::vector<t_particle*>& particles,
+                                int depth,
+                                long long key_prefix,
+                                double box_length,
+                                const std::array<double, 3>& origin) 
+{
+    std::cout << "Call: count=" << particles.size() 
+                << " depth=" << depth 
+                << " prefix=" << key_prefix << "\n";
 
-    if (count == 1) {
+    if (particles.empty()) return;
+
+    if (particles.size() == 1) {
         long long final_key = key_prefix;
-        printf("Key prefix: %lld\n", key_prefix);
-        printf("Actual key: %d\n", (*particles)[0].key);
         int remaining_depth = MAX_DEPTH - depth;
-        //final_key <<= (3 * remaining_depth); 
-        (*particles)[0].key = final_key;
-        printf("Actual key: %d\n", (*particles)[0].key);
-        // gets msb
-        //particles[0]->quad = ( particles[0]->key >> (3 * MAX_DEPTH - 3)) & 0b111;   
+        //final_key <<= (3 * remaining_depth);
+        particles[0]->key = final_key;
         return;
     }
 
     if (depth >= MAX_DEPTH) {
-        for (int i = 0; i < count; i++) {
-            (*particles)[i].key = key_prefix;
+        for (auto* p : particles) {
+            p->key = key_prefix;
         }
-        printf("MAX_DEPTH reached.\n", count);
+        std::cout << "MAX_DEPTH reached.\n";
         return;
     }
 
-
     double half = box_length / 2.0;
-    double center[3] = {
+    std::array<double, 3> center = {
         origin[0] + half,
         origin[1] + half,
         origin[2] + half
     };
-    
-    t_particle **octants = (t_particle **)malloc(8 * sizeof(t_particle*));
-    for(int i = 0; i < 8; i++) octants[i] = (t_particle *)malloc(count * sizeof(t_particle));
-    
-    int oct_count[8] = {0};
 
-    for (int i = 0; i < count; i++) {
+    std::vector<t_particle*> octants[8];
+
+    for (auto* p : particles) {
         int oct = 0;
-        if ((*particles)[i].coord[0] >= center[0]) oct |= 1;
-        if ((*particles)[i].coord[1] >= center[1]) oct |= 2;
-        if ((*particles)[i].coord[2] >= center[2]) oct |= 4;
-        octants[oct][oct_count[oct]] = (*particles)[i];
-        oct_count[oct]++;
+        if (p->coord[0] >= center[0]) oct |= 1;
+        if (p->coord[1] >= center[1]) oct |= 2;
+        if (p->coord[2] >= center[2]) oct |= 4;
+        octants[oct].push_back(p);
     }
 
     for (int i = 0; i < 8; i++) {
-        if (oct_count[i] > 0) {
+        if (!octants[i].empty()) {
             long long new_key = (key_prefix << 3) | i;
 
-            double new_origin[3] = {
+            std::array<double, 3> new_origin = {
                 origin[0] + (i & 1 ? half : 0),
                 origin[1] + (i & 2 ? half : 0),
                 origin[2] + (i & 4 ? half : 0)
             };
 
-            run_oct_tree_recursive(octants, oct_count[i], depth + 1, new_key, half, new_origin);
+            run_oct_tree_recursive(octants[i], depth + 1, new_key, half, new_origin);
         }
     }
-
-    for (int i = 0; i < 8; i++) free(octants[i]);
 }
 
 
-int generate_particles_keys(t_particle **particle_array, int count, double box_length){
-    long long key_prefix = 0;
-    double origin[3] = {0.0, 0.0, 0.0};
-    run_oct_tree_recursive(particle_array, count, 0, 0, box_length, origin);
+int generate_particles_keys(t_particle *particle_array, int count, double box_length) {
+    std::vector<t_particle*> particles;
+    particles.reserve(count);
+
+    for (int i = 0; i < count; i++) {
+        particles.push_back(&particle_array[i]);
+    }
+
+    std::array<double, 3> origin = {0.0, 0.0, 0.0};
+    run_oct_tree_recursive(particles, 0, 0, box_length, origin);
+
     return 0;
 }
+
 
 bool compare_particles(const t_particle &a, const t_particle &b) {
     return a.key < b.key;

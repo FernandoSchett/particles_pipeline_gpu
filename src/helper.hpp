@@ -7,6 +7,9 @@
 #include <mpi.h>
 #include <Random123/philox.h>
 #include <Random123/uniform.hpp>
+#include <iostream>
+#include <vector>
+#include <array>
 
 typedef struct particle{
     int mpi_rank;
@@ -25,8 +28,8 @@ int box_distribution(t_particle **particle_array, int count, double box_length);
 int parallel_write_to_file(t_particle *particle_array, int *count, char *filename);
 int serial_write_to_file(t_particle *particle_array, int count, char *filename);
 int serial_read_from_file(t_particle **particle_array, int *count, char *filename);
-int generate_particles_keys(t_particle **particle_array, int count, double box_length);
-void run_oct_tree_recursive(t_particle **particles, int count, int depth, long long key_prefix, double box_length, double origin[3]);
+int generate_particles_keys(t_particle *particle_array, int count, double box_length);
+void run_oct_tree_recursive(t_particle *particles, int count, int depth, long long key_prefix, double box_length, double origin[3]);
 int distribute_particles(t_particle **particles, int* particle_vector_size, int nprocs);
 void print_particles(t_particle *particle_array, int size, int rank);       
 
