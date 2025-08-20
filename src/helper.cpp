@@ -179,30 +179,22 @@ int serial_read_from_file(t_particle **particle_array, int *count, char *filenam
 }
 
 void run_oct_tree_recursive(std::vector<t_particle*>& particles,
-                                int depth,
-                                long long key_prefix,
-                                double box_length,
-                                const std::array<double, 3>& origin) 
+                            int depth,
+                            long long key_prefix,
+                            double box_length,
+                            const std::array<double, 3>& origin) 
 {
     std::cout << "Call: count=" << particles.size() 
-                << " depth=" << depth 
-                << " prefix=" << key_prefix << "\n";
+              << " depth=" << depth 
+              << " prefix=" << key_prefix << "\n";
 
     if (particles.empty()) return;
-
-    if (particles.size() == 1) {
-        long long final_key = key_prefix;
-        int remaining_depth = MAX_DEPTH - depth;
-        //final_key <<= (3 * remaining_depth);
-        particles[0]->key = final_key;
-        return;
-    }
 
     if (depth >= MAX_DEPTH) {
         for (auto* p : particles) {
             p->key = key_prefix;
         }
-        std::cout << "MAX_DEPTH reached.\n";
+        std::cout << "MAX_DEPTH\n";
         return;
     }
 
@@ -239,6 +231,7 @@ void run_oct_tree_recursive(std::vector<t_particle*>& particles,
 }
 
 
+
 int generate_particles_keys(t_particle *particle_array, int count, double box_length) {
     std::vector<t_particle*> particles;
     particles.reserve(count);
@@ -264,8 +257,16 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
 
     int *send_counts = (int*)calloc(nprocs, sizeof(int));
     int dest;   
+    
+    int bits_needed = 0;
+    int tmp = nprocs - 1;
+    while (tmp > 0) {
+        bits_needed++;
+        tmp >>= 1;
+    }
+
     for (int i = 0; i < *particle_vector_size; i++){
-        dest = (((*particles)[i].key >> (3 * MAX_DEPTH - 3)) & (nprocs-1)) % nprocs;     
+        dest = ((*particles)[i].key >> (3 * MAX_DEPTH - bits_needed)) & (nprocs - 1);   
         send_counts[dest]++;
     }
 
