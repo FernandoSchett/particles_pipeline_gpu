@@ -4,7 +4,7 @@
 MPI_Datatype MPI_particle;
 int register_MPI_Particle(MPI_Datatype *MPI_Particle){
     int blocklengths[NPROPS_PARTICLE] = {1, 1, 3}; 
-    MPI_Datatype array_types[NPROPS_PARTICLE] = {MPI_INT, MPI_INTEGER, MPI_DOUBLE};
+    MPI_Datatype array_types[NPROPS_PARTICLE] = {MPI_INT, MPI_LONG_LONG_INT, MPI_DOUBLE};
     t_particle dummy_particle[2];
     MPI_Aint address[NPROPS_PARTICLE + 1];
     MPI_Aint displacements[NPROPS_PARTICLE];
@@ -263,8 +263,9 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
     print_particles(*particles, *particle_vector_size, 0);
 
     int *send_counts = (int*)calloc(nprocs, sizeof(int));
+    int dest;   
     for (int i = 0; i < *particle_vector_size; i++){
-        int dest = (((*particles)[i].key >> (3 * MAX_DEPTH - 3)) & (nprocs-1)) % nprocs;        
+        dest = (((*particles)[i].key >> (3 * MAX_DEPTH - 3)) & (nprocs-1)) % nprocs;     
         send_counts[dest]++;
     }
 
@@ -289,10 +290,19 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
     MPI_Alltoallv(*particles, send_counts, send_disp, MPI_particle,
                   recv_buffer, recv_counts, recv_disp, MPI_particle,
                   MPI_COMM_WORLD);
-
+    
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    for(int i = 0; i < total_recv; i++){
+        if(rank != 0)
+            printf("RANK: %d\n", rank);
+        recv_buffer[i].mpi_rank = rank;  
+    }
+                  
     free(*particles);
     *particles = recv_buffer;
     *particle_vector_size = total_recv;
+    
 
     free(send_counts);
     free(send_disp);
@@ -304,7 +314,17 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
 
 void print_particles(t_particle *particle_array, int size, int rank) {        
     for (int i = 0; i < size; i++){ 
-        printf("P_rank: %d, %d, %f, %f, %f, %lld\n", rank, particle_array[i].mpi_rank, particle_array[i].coord[0], \
-            particle_array[i].coord[1], particle_array[i].coord[2], particle_array[i].key); 
+        printf("P_rank: %d, %d, %f, %f, %f, key: %lld, key_bin: ", 
+               rank, particle_array[i].mpi_rank, 
+               particle_array[i].coord[0], 
+               particle_array[i].coord[1], 
+               particle_array[i].coord[2], 
+               particle_array[i].key);
+
+        for(int b = 63; b >= 0; b--){ 
+            printf("%lld", (particle_array[i].key >> b) & 1LL);
+        }
+
+        printf("\n");
     }
 }

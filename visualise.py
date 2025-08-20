@@ -37,7 +37,7 @@ ax = fig.add_subplot(projection='3d')
 cm = plt.get_cmap('plasma')
 p = ax.scatter(coord_array[:,0], coord_array[:,1], coord_array[:,2], c=rank_array, cmap=cm)
 ax.set_xlabel('X')
-ax.set_ylabel('Y')
+ax.set_ylabel('Y') 
 ax.set_zlabel('Z')
 
 fig.colorbar(p)
