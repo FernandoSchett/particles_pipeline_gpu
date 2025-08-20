@@ -184,9 +184,8 @@ void run_oct_tree_recursive(std::vector<t_particle*>& particles,
                             double box_length,
                             const std::array<double, 3>& origin) 
 {
-    std::cout << "Call: count=" << particles.size() 
-              << " depth=" << depth 
-              << " prefix=" << key_prefix << "\n";
+    
+    //std::cout << "Call: count=" << particles.size() << " depth=" << depth << " prefix=" << key_prefix << "\n";
 
     if (particles.empty()) return;
 
@@ -194,7 +193,7 @@ void run_oct_tree_recursive(std::vector<t_particle*>& particles,
         for (auto* p : particles) {
             p->key = key_prefix;
         }
-        std::cout << "MAX_DEPTH\n";
+        //std::cout << "MAX_DEPTH\n";
         return;
     }
 
