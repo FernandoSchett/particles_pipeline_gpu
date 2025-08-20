@@ -252,8 +252,6 @@ int generate_particles_keys(t_particle **particle_array, int count, double box_l
     return 0;
 }
 
-
-
 bool compare_particles(const t_particle &a, const t_particle &b) {
     return a.key < b.key;
 }
@@ -264,7 +262,7 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
 
     int *send_counts = (int*)calloc(nprocs, sizeof(int));
     for (int i = 0; i < *particle_vector_size; i++){
-        int dest = ((*particles)[i].key >> (3 * MAX_DEPTH - 3)) & (nprocs-1);        
+        int dest = (((*particles)[i].key >> (3 * MAX_DEPTH - 3)) & (nprocs-1)) % nprocs;        
         send_counts[dest]++;
     }
 
@@ -304,7 +302,7 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
 
 void print_particles(t_particle *particle_array, int size, int rank) {        
     for (int i = 0; i < size; i++){ 
-        printf("P_rank: %d, %d, %f, %f, %f, %ld, %d\n", rank, particle_array[i].mpi_rank, particle_array[i].coord[0], \
+        printf("P_rank: %d, %d, %f, %f, %f, %ld\n", rank, particle_array[i].mpi_rank, particle_array[i].coord[0], \
             particle_array[i].coord[1], particle_array[i].coord[2], particle_array[i].key); 
     }
 }
