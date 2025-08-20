@@ -11,7 +11,7 @@
 typedef struct particle{
     int mpi_rank;
     long long int key;
-    int quad;
+    //int quad;
     double coord[3];
 } t_particle;
 

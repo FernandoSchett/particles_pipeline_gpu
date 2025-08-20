@@ -1,9 +1,10 @@
 #include "./helper.hpp"
 
+
 MPI_Datatype MPI_particle;
 int register_MPI_Particle(MPI_Datatype *MPI_Particle){
     int blocklengths[NPROPS_PARTICLE] = {1, 1, 3}; 
-    MPI_Datatype array_types[NPROPS_PARTICLE] = {MPI_INT, MPI_LONG_LONG, MPI_DOUBLE};
+    MPI_Datatype array_types[NPROPS_PARTICLE] = {MPI_INT, MPI_INTEGER, MPI_DOUBLE};
     t_particle dummy_particle[2];
     MPI_Aint address[NPROPS_PARTICLE + 1];
     MPI_Aint displacements[NPROPS_PARTICLE];
@@ -45,6 +46,7 @@ int allocate_particle(t_particle **particle_array, int count){
 
     return 0;
 }
+
 
 int box_distribution(t_particle **particle_array, int count, double box_length){
     int p_rank;
@@ -189,7 +191,7 @@ void run_oct_tree_recursive( t_particle **particles, int count, int depth, long 
         particles[0]->key = final_key;
 
         // gets msb
-        particles[0]->quad = ( particles[0]->key >> (3 * MAX_DEPTH - 3)) & 0b111;   
+        //particles[0]->quad = ( particles[0]->key >> (3 * MAX_DEPTH - 3)) & 0b111;   
         return;
     }    
 
@@ -253,7 +255,7 @@ int generate_particles_keys(t_particle **particle_array, int count, double box_l
 
 
 bool compare_particles(const t_particle &a, const t_particle &b) {
-    return a.quad < b.quad;
+    return a.key < b.key;
 }
 
 int distribute_particles(t_particle **particles, int *particle_vector_size, int nprocs){
@@ -262,7 +264,7 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
 
     int *send_counts = (int*)calloc(nprocs, sizeof(int));
     for (int i = 0; i < *particle_vector_size; i++){
-        int dest = (*particles)[i].quad;  
+        int dest = particles[0]->key >> (3 * MAX_DEPTH - 3) & 0b111;  
         send_counts[dest]++;
     }
 
@@ -303,6 +305,6 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
 void print_particles(t_particle *particle_array, int size, int rank) {        
     for (int i = 0; i < size; i++){ 
         printf("P_rank: %d, %d, %f, %f, %f, %ld, %d\n", rank, particle_array[i].mpi_rank, particle_array[i].coord[0], \
-            particle_array[i].coord[1], particle_array[i].coord[2], particle_array[i].key, particle_array[i].quad); 
+            particle_array[i].coord[1], particle_array[i].coord[2], particle_array[i].key); 
     }
 }
