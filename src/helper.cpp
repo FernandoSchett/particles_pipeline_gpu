@@ -56,7 +56,7 @@ int box_distribution(t_particle **particle_array, int count, double box_length){
     RNG rng;
     RNG::ctr_type c={{}};
     RNG::ukey_type uk={{}};
-    uk[0] = p_rank + 20; // some user_supplied_seed
+    uk[0] = p_rank; // some user_supplied_seed
     RNG::key_type k=uk;
     RNG::ctr_type r;
 
