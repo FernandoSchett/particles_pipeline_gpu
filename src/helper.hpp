@@ -16,7 +16,7 @@ typedef struct particle{
 } t_particle;
 
 #define NPROPS_PARTICLE 3
-#define MAX_DEPTH 19
+#define MAX_DEPTH 15
 
 extern MPI_Datatype MPI_particle;
 extern int register_MPI_Particle(MPI_Datatype *MPI_Particle);

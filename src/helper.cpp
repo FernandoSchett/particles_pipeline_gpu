@@ -186,30 +186,25 @@ void run_oct_tree_recursive( t_particle **particles, int count, int depth, long 
 
     if (count == 1) {
         long long final_key = key_prefix;
+        printf("Key prefix: %lld\n", key_prefix);
+        printf("Actual key: %d\n", (*particles)[0].key);
         int remaining_depth = MAX_DEPTH - depth;
-        final_key <<= (3 * remaining_depth); 
-        particles[0]->key = final_key;
-
+        //final_key <<= (3 * remaining_depth); 
+        (*particles)[0].key = final_key;
+        printf("Actual key: %d\n", (*particles)[0].key);
         // gets msb
         //particles[0]->quad = ( particles[0]->key >> (3 * MAX_DEPTH - 3)) & 0b111;   
         return;
-    }    
+    }
 
     if (depth >= MAX_DEPTH) {
         for (int i = 0; i < count; i++) {
-            particles[i]->key = key_prefix;
+            (*particles)[i].key = key_prefix;
         }
         printf("MAX_DEPTH reached.\n", count);
         return;
     }
 
-
-    t_particle **octants[8];
-    int oct_count[8] = {0};
-
-    for (int i = 0; i < 8; i++) {
-        octants[i] = (t_particle **)malloc(count * sizeof(t_particle *));
-    }
 
     double half = box_length / 2.0;
     double center[3] = {
@@ -217,13 +212,18 @@ void run_oct_tree_recursive( t_particle **particles, int count, int depth, long 
         origin[1] + half,
         origin[2] + half
     };
+    
+    t_particle **octants = (t_particle **)malloc(8 * sizeof(t_particle*));
+    for(int i = 0; i < 8; i++) octants[i] = (t_particle *)malloc(count * sizeof(t_particle));
+    
+    int oct_count[8] = {0};
 
     for (int i = 0; i < count; i++) {
         int oct = 0;
         if ((*particles)[i].coord[0] >= center[0]) oct |= 1;
         if ((*particles)[i].coord[1] >= center[1]) oct |= 2;
         if ((*particles)[i].coord[2] >= center[2]) oct |= 4;
-        octants[oct][oct_count[oct]] = &(*particles)[i];
+        octants[oct][oct_count[oct]] = (*particles)[i];
         oct_count[oct]++;
     }
 
@@ -237,7 +237,7 @@ void run_oct_tree_recursive( t_particle **particles, int count, int depth, long 
                 origin[2] + (i & 4 ? half : 0)
             };
 
-            run_oct_tree_recursive(octants[i], oct_count[i], depth + 1, new_key, half, new_origin);
+            run_oct_tree_recursive(octants, oct_count[i], depth + 1, new_key, half, new_origin);
         }
     }
 
@@ -302,7 +302,7 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
 
 void print_particles(t_particle *particle_array, int size, int rank) {        
     for (int i = 0; i < size; i++){ 
-        printf("P_rank: %d, %d, %f, %f, %f, %ld\n", rank, particle_array[i].mpi_rank, particle_array[i].coord[0], \
+        printf("P_rank: %d, %d, %f, %f, %f, %lld\n", rank, particle_array[i].mpi_rank, particle_array[i].coord[0], \
             particle_array[i].coord[1], particle_array[i].coord[2], particle_array[i].key); 
     }
 }
