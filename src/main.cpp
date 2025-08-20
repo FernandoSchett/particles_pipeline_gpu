@@ -38,7 +38,6 @@ int main(int argc, char **argv){
     allocate_particle(&rank_array, length_per_rank);
     box_distribution(&rank_array, length_per_rank, box_length);
     generate_particles_keys(&rank_array, length_per_rank, box_length);
-    print_particles(rank_array, length_per_rank, rank);
     distribute_particles(&rank_array, &length_per_rank, nprocs);
 
     parallel_write_to_file(rank_array, length_vector, filename);
@@ -61,7 +60,6 @@ int main(int argc, char **argv){
     total_length = 0;
     if (rank == 0){
         serial_read_from_file(&rank_array, &total_length, filename);
-        free(rank_array);
     }
 
     MPI_Finalize();
