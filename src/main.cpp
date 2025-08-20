@@ -33,8 +33,10 @@ int main(int argc, char **argv){
 
     allocate_particle(&rank_array, length_per_rank);
     box_distribution(&rank_array, length_per_rank, box_length);
-    //generate_particles_keys(&rank_array, length_per_rank, box_length);
-    //distribute_particles(&rank_array, &length_per_rank, nprocs);
+    generate_particles_keys(&rank_array, length_per_rank, box_length);
+    
+    distribute_particles(&rank_array, &length_per_rank, nprocs);
+    MPI_Allgather(&length_per_rank, 1, MPI_INT, length_vector, 1, MPI_INT, MPI_COMM_WORLD);
 
     parallel_write_to_file(rank_array, length_vector, filename);
 

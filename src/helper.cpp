@@ -199,7 +199,7 @@ void run_oct_tree_recursive( t_particle **particles, int count, int depth, long 
         for (int i = 0; i < count; i++) {
             particles[i]->key = key_prefix;
         }
-        printf("MAX_DEPTH reached: assigning same key to %d particles.\n", count);
+        printf("MAX_DEPTH reached.\n", count);
         return;
     }
 
@@ -264,7 +264,7 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
 
     int *send_counts = (int*)calloc(nprocs, sizeof(int));
     for (int i = 0; i < *particle_vector_size; i++){
-        int dest = particles[0]->key >> (3 * MAX_DEPTH - 3) & 0b111;  
+        int dest = ((*particles)[i].key >> (3 * MAX_DEPTH - 3)) & (nprocs-1);        
         send_counts[dest]++;
     }
 
