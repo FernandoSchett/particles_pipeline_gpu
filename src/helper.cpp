@@ -253,7 +253,7 @@ bool compare_particles(const t_particle &a, const t_particle &b) {
 
 int distribute_particles(t_particle **particles, int *particle_vector_size, int nprocs){
     std::sort(*particles, *particles + *particle_vector_size, compare_particles);
-    print_particles(*particles, *particle_vector_size, 0);
+    //print_particles(*particles, *particle_vector_size, 0);
 
     int *send_counts = (int*)calloc(nprocs, sizeof(int));
     int dest;   
@@ -296,7 +296,6 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     for(int i = 0; i < total_recv; i++){
         if(rank != 0)
-            printf("RANK: %d\n", rank);
         recv_buffer[i].mpi_rank = rank;  
     }
                   
