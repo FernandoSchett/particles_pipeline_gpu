@@ -265,7 +265,7 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
     }
 
     for (int i = 0; i < *particle_vector_size; i++){
-        dest = ((*particles)[i].key >> (3 * MAX_DEPTH - bits_needed)) & (nprocs - 1);   
+        dest = ((*particles)[i].key >> (3 * MAX_DEPTH - bits_needed)) % nprocs;   
         send_counts[dest]++;
     }
 
