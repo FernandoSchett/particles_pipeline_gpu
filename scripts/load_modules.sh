@@ -1,3 +1,3 @@
 #!/bin/bash
 
-moudle load Boost/1.86.0
+module load Boost/1.86.0 GCC OpenMPI

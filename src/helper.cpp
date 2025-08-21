@@ -271,6 +271,7 @@ void radix_sort_particles(t_particle *particles, int n) {
 
 
 int distribute_particles(t_particle **particles, int *particle_vector_size, int nprocs){
+    //std::sort(*particles, *particles + *particle_vector_size, compare_particles);
     radix_sort_particles(*particles, *particle_vector_size);    
     //print_particles(*particles, *particle_vector_size, 0);
 
