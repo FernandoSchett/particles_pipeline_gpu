@@ -13,19 +13,17 @@
 void setup_particles_box_length(int power, int nprocs, int rank, int *length_per_rank, double *box_length) {
     int total_particles  = pow(10, power);
     *box_length       = pow(10, power);
-    *length_per_rank  = total_particles / nprocs;
+    *length_per_rank  = (rank+1)*(total_particles / nprocs);
 
     if (rank == nprocs - 1) {
         *length_per_rank += total_particles % nprocs;
     }
 
     if (rank == 0) {
-        printf("%d particles distributed like ~%d between %d processes in a %.1f sized box.\n",
+        printf("%d particles distributed like (rank_number*%d) between %d processes in a %.1f sized box.\n",
                total_particles, *length_per_rank, nprocs, *box_length);
     }
 }
-
-
 
 int main(int argc, char **argv){
     int rank, nprocs, i;
