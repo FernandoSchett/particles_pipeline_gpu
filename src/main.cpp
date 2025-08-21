@@ -80,24 +80,10 @@ int main(int argc, char **argv){
         total_length += length_vector[i];
     }
     
-    receive_array = (t_particle *)malloc(total_length*sizeof(t_particle));
-    disp = (int *)malloc(nprocs*sizeof(int));
-    disp[0] = 0;
-    for (int i = 1; i < nprocs; i++){
-        disp[i] = disp[i-1] + length_vector[i-1];
-    }
-    MPI_Gatherv(rank_array, length_per_rank, MPI_particle, receive_array, length_vector, disp, MPI_particle, 0, MPI_COMM_WORLD); 
 
-    if (rank == 0) serial_write_to_file(receive_array, total_length, filename2);
-    total_length = 0;
-    if (rank == 0){
-        serial_read_from_file(&rank_array, &total_length, filename);
-    }
 
     free(rank_array);
-    free(receive_array);
     free(length_vector);
-    free(disp);
     MPI_Finalize();
     return 0;
 }
