@@ -10,4 +10,11 @@
 
 3. Run:
 
-         sh scripts/run_program.sh <number_processes>
+         sh scripts/run_program.sh <number_processes> <power_to_particle_numbers>
+
+
+## How reproduce the experiments:
+
+1. Run:
+
+         sh scripts/run_experiment.sh 
