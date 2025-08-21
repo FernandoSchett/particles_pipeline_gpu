@@ -1,4 +1,4 @@
-find_package(Boost 1.86.0 REQUIRED COMPONENTS sort)
+
 add_library(helper STATIC helper.cpp helper.hpp)
 
 target_include_directories(helper PUBLIC 
