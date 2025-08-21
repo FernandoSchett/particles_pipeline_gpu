@@ -14,6 +14,9 @@ cmake --build .
 
 for np in 4 8 16 32 64 128
 do
-    echo "Executing with $np processes..."
-    mpirun -np $np ./p_sfc_exe 8
+    for i in 1 2 3 4 5
+    do
+        echo "Executing with $np processes..."
+        mpirun -np $np ./p_sfc_exe 8
+    done
 done

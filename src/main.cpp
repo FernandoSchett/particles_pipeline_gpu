@@ -11,9 +11,9 @@
 #define DEFAULT_POWER 3
 
 void setup_particles_box_length(int power, int nprocs, int rank, int *length_per_rank, double *box_length) {
-    int slice = (pow(10,power) / nprocs);
-    int total_particles  =((nprocs+2)/2) * slice;
-    long long RAM_particles = total_particles * 40; // sizeof(t_particle) is 36, but it can be considered as 40.
+    long long slice = (int) (pow(10,power) / nprocs);
+    int total_particles = ((1 + nprocs)*nprocs/2)*slice;
+   long long RAM_particles = total_particles * 40; // sizeof(t_particle) is 36, but it can be considered as 40.
     *box_length       = pow(10, power); 
     *length_per_rank  = (rank+1)*slice;
 
