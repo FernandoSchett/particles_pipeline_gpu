@@ -246,8 +246,32 @@ bool compare_particles(const t_particle &a, const t_particle &b) {
     return a.key < b.key;
 }
 
+void radix_sort_particles(t_particle *particles, int n) {
+    t_particle *tmp = (t_particle*)malloc(n * sizeof(t_particle));
+    const int BITS = 64;       
+    const int BASE = 256;      
+    int count[BASE];
+    
+    for (int shift = 0; shift < BITS; shift += 8) {
+        memset(count, 0, sizeof(count));
+        
+        for (int i = 0; i < n; i++)
+            count[(particles[i].key >> shift) & 0xFF]++;
+        
+        for (int i = 1; i < BASE; i++)
+            count[i] += count[i-1];
+        
+        for (int i = n-1; i >= 0; i--)
+            tmp[--count[(particles[i].key >> shift) & 0xFF]] = particles[i];
+        
+        memcpy(particles, tmp, n * sizeof(t_particle));
+    }
+    free(tmp);
+}
+
+
 int distribute_particles(t_particle **particles, int *particle_vector_size, int nprocs){
-    std::sort(*particles, *particles + *particle_vector_size, compare_particles);
+    radix_sort_particles(*particles, *particle_vector_size);    
     //print_particles(*particles, *particle_vector_size, 0);
 
     int *send_counts = (int*)calloc(nprocs, sizeof(int));

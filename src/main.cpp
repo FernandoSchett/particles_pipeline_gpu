@@ -8,7 +8,7 @@
 
 #include "./helper.hpp"
 
-#define DEFAULT_POWER 2
+#define DEFAULT_POWER 3
 
 void setup_particles_box_length(int power, int nprocs, int rank, int *length_per_rank, double *box_length) {
     int total_particles  = pow(10, power);
@@ -62,6 +62,8 @@ int main(int argc, char **argv){
     
     generate_particles_keys(rank_array, length_per_rank, box_length);
     distribute_particles(&rank_array, &length_per_rank, nprocs);
+    // Update length_vector
+    MPI_Allgather(&length_per_rank, 1, MPI_INT, length_vector, 1, MPI_INT, MPI_COMM_WORLD);
     
     MPI_Barrier(MPI_COMM_WORLD);
     end_time = MPI_Wtime();
@@ -69,8 +71,7 @@ int main(int argc, char **argv){
     if (rank == 0)
         printf("Time to generate keys + distribute particles: %f\n", end_time - start_time);
 
-    // Everybody need to know howm much much particles each other have. 
-    MPI_Allgather(&length_per_rank, 1, MPI_INT, length_vector, 1, MPI_INT, MPI_COMM_WORLD);
+    
     parallel_write_to_file(rank_array, length_vector, filename);
     total_length = 0;
     for (i = 0; i < nprocs; i++){
