@@ -12,4 +12,4 @@ cmake ..
 
 cmake --build .
 
-mpirun -np $1 ./p_sfc_exe 
+mpirun -np $1 ./p_sfc_exe $2
