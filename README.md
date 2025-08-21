@@ -10,4 +10,4 @@
 
 3. Run:
 
-         sh scripts/run_program.sh
+         sh scripts/run_program.sh <number_processes>
