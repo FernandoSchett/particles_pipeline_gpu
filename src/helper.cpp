@@ -178,11 +178,7 @@ int serial_read_from_file(t_particle **particle_array, int *count, char *filenam
     return 0;
 }
 
-void run_oct_tree_recursive(std::vector<t_particle*>& particles,
-                            int depth,
-                            long long key_prefix,
-                            double box_length,
-                            const std::array<double, 3>& origin) 
+void run_oct_tree_recursive(std::vector<t_particle*>& particles, int depth, long long key_prefix, double box_length, const std::array<double, 3>& origin) 
 {
     
     //std::cout << "Call: count=" << particles.size() << " depth=" << depth << " prefix=" << key_prefix << "\n";
