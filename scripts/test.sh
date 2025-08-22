@@ -13,9 +13,6 @@ cd build
 
 cmake ..
 cmake --build .
-#mv ./p_sfc_exe ../scripts/
-#cd ..
-#cd scripts/
 
 for np in 4 
 do
