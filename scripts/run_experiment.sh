@@ -3,8 +3,9 @@
 #SBATCH --output=nandos_cool_merg_algthm_exp_%j.out
 #SBATCH --error=nandos_cool_merg_algthm_exp_%j.err
 #SBATCH --cpus-per-task=1
-#SBATCH --time=02:00:00
-#SBATCH --partition=dc-cpu*
+#SBATCH --time=00:10:00
+#SBATCH --partition=dc-cpu
+#SBATCH --account=gsp25
      
 source ./load_modules.sh
 
@@ -25,5 +26,5 @@ echo "Running with $NP processes"
 for i in 1 2 3 4 5
 do
     echo "Execution #$i with $NP processes..."
-    srun -n $NP ./p_sfc_exe 9
+    srun -n $NP ./p_sfc_exe 2
 done
