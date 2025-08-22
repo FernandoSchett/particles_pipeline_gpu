@@ -67,7 +67,7 @@ int main(int argc, char **argv){
     double box_length;
     double start_time, end_time;
     t_particle *rank_array;
-    char filename[128] = "particle_file";
+    char filename[128];
 
     long long total_particles;
     double RAM_GB;
@@ -106,6 +106,7 @@ int main(int argc, char **argv){
     MPI_Barrier(MPI_COMM_WORLD);
     end_time = MPI_Wtime();
 
+    sprintf(filename, "particle_file_n%d_total%lld", nprocs, total_particles);
     parallel_write_to_file(rank_array, length_vector, filename);
     
     if(rank == 0)
