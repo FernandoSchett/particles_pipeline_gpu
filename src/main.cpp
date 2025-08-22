@@ -54,6 +54,10 @@ void log_results(int rank, int power, long long total_particles, int length_per_
     fprintf(f, "%s,%d,%lld,%d,%d,%.1f,%.2f,%f\n", 
             time_str, power, total_particles, length_per_rank, nprocs,
             box_length, RAM_GB, execution_time);
+    printf("%s,%d,%lld,%d,%d,%.1f,%.2f,%f\n", 
+            time_str, power, total_particles, length_per_rank, nprocs,
+            box_length, RAM_GB, execution_time);
+
 
     fclose(f);
 }
