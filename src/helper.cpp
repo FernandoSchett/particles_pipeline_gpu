@@ -286,8 +286,11 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
     }
 
     for (int i = 0; i < *particle_vector_size; i++){
-        dest = ((*particles)[i].key >> (3 * MAX_DEPTH - bits_needed)) % nprocs;
-        //printf("Dest: %d\n", dest);   
+        long long key = (*particles)[i].key;
+        int B = 3 * MAX_DEPTH;               
+        unsigned long long key64 = (B < 64) ? ((unsigned long long)key << (64 - B)) : (unsigned long long)key;
+        unsigned __int128 prod = (unsigned __int128)key64 * (unsigned long long)nprocs;
+        dest = (int)(prod >> 64);
         send_counts[dest]++;
     }
 
