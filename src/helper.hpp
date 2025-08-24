@@ -32,6 +32,7 @@ int serial_read_from_file(t_particle **particle_array, int *count, char *filenam
 int generate_particles_keys(t_particle *particle_array, int count, double box_length);
 void run_oct_tree_recursive(t_particle *particles, int count, int depth, long long key_prefix, double box_length, double origin[3]);
 int distribute_particles(t_particle **particles, int* particle_vector_size, int nprocs);
+int redistribute_equal_counts(t_particle **particles, int *particle_vector_size, int nprocs);
 void print_particles(t_particle *particle_array, int size, int rank);       
 
 #endif

@@ -103,7 +103,8 @@ int main(int argc, char **argv){
 
     generate_particles_keys(rank_array, length_per_rank, box_length);
     distribute_particles(&rank_array, &length_per_rank, nprocs);
-    
+    redistribute_equal_counts(&rank_array, &length_per_rank, nprocs);
+
     // Update length_vector
     MPI_Allgather(&length_per_rank, 1, MPI_INT, length_vector, 1, MPI_INT, MPI_COMM_WORLD);
 

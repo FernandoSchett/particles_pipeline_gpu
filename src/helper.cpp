@@ -318,7 +318,7 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
     
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    printf("Rank %d, Number Particles: %d\n", rank, total_recv);
+    //printf("Rank %d, Number Particles: %d\n", rank, total_recv);
     for(int i = 0; i < total_recv; i++){
         recv_buffer[i].mpi_rank = rank;  
     }
@@ -335,6 +335,97 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
     return 0;
 }
 
+
+int redistribute_equal_counts(t_particle **particles, int *particle_vector_size, int nprocs) {
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    int local_n = *particle_vector_size;
+    std::vector<int> counts(nprocs, 0);
+    MPI_Allgather(&local_n, 1, MPI_INT, counts.data(), 1, MPI_INT, MPI_COMM_WORLD);
+
+    long long total = 0;
+    for (int c : counts) total += c;
+    int q = (int)(total / nprocs);
+    int r = (int)(total % nprocs);
+
+    std::vector<int> target(nprocs, q);
+    for (int i = 0; i < r; ++i) target[i]++;
+
+    struct Slot { int rank; int amt; };
+    std::vector<Slot> surplus, deficit;
+    surplus.reserve(nprocs);
+    deficit.reserve(nprocs);
+    for (int i = 0; i < nprocs; ++i) {
+        int diff = counts[i] - target[i];
+        if (diff > 0) surplus.push_back({i, diff});
+        else if (diff < 0) deficit.push_back({i, -diff});
+    }
+
+    if (surplus.empty() && deficit.empty()) return 0;
+
+    std::vector<int> S(nprocs * nprocs, 0);
+    size_t si = 0, di = 0;
+    while (si < surplus.size() && di < deficit.size()) {
+        int s_rank = surplus[si].rank;
+        int d_rank = deficit[di].rank;
+        int amt = std::min(surplus[si].amt, deficit[di].amt);
+        S[s_rank * nprocs + d_rank] += amt;
+        surplus[si].amt -= amt;
+        deficit[di].amt -= amt;
+        if (surplus[si].amt == 0) ++si;
+        if (deficit[di].amt == 0) ++di;
+    }
+
+    std::vector<int> sendcounts(nprocs, 0), recvcounts(nprocs, 0);
+    for (int j = 0; j < nprocs; ++j) sendcounts[j] = S[rank * nprocs + j];
+    for (int i = 0; i < nprocs; ++i) recvcounts[i] = S[i * nprocs + rank];
+
+    std::vector<int> sdispls(nprocs, 0), rdispls(nprocs, 0);
+    for (int i = 1; i < nprocs; ++i) {
+        sdispls[i] = sdispls[i-1] + sendcounts[i-1];
+        rdispls[i] = rdispls[i-1] + recvcounts[i-1];
+    }
+    int send_total = 0, recv_total = 0;
+    for (int i = 0; i < nprocs; ++i) { send_total += sendcounts[i]; recv_total += recvcounts[i]; }
+
+    int keep = local_n - send_total;
+    if (keep < 0) { MPI_Abort(MPI_COMM_WORLD, 1); }
+
+    std::vector<t_particle> sendbuf(send_total);
+    int cursor = 0;
+    for (int dst = 0; dst < nprocs; ++dst) {
+        int amt = sendcounts[dst];
+        if (amt > 0) {
+            std::copy_n((*particles) + keep + cursor, amt, sendbuf.data() + sdispls[dst]);
+            cursor += amt;
+        }
+    }
+
+    std::vector<t_particle> recvbuf(recv_total);
+    MPI_Alltoallv(sendbuf.data(), sendcounts.data(), sdispls.data(), MPI_particle,
+                  recvbuf.data(), recvcounts.data(), rdispls.data(), MPI_particle,
+                  MPI_COMM_WORLD);
+
+    for (auto &p : recvbuf) p.mpi_rank = rank;
+
+    std::vector<t_particle> balanced;
+    balanced.reserve(keep + recv_total);
+    balanced.insert(balanced.end(), (*particles), (*particles) + keep);
+    balanced.insert(balanced.end(), recvbuf.begin(), recvbuf.end());
+
+    if ((int)balanced.size() != target[rank]) {
+        fprintf(stderr, "Rank %d: final %zu != target %d\n", rank, balanced.size(), target[rank]);
+        MPI_Abort(MPI_COMM_WORLD, 2);
+    }
+
+    free(*particles);
+    t_particle *newbuf = (t_particle*)malloc(balanced.size() * sizeof(t_particle));
+    std::memcpy(newbuf, balanced.data(), balanced.size() * sizeof(t_particle));
+    *particles = newbuf;
+    *particle_vector_size = (int)balanced.size();
+    printf("Rank %d, Number Particles: %d\n", rank, *particle_vector_size);
+    return 0;
+}
 
 void print_particles(t_particle *particle_array, int size, int rank) {        
     for (int i = 0; i < size; i++){ 
