@@ -1,14 +1,14 @@
 #ifndef HELPER_H
 #define HELPER_H
 
-#include <cstring>
-#include <stdlib.h> 
-#include <fstream>
-#include <math.h>
-#include <mpi.h>
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include <array>
+#include <cstring>
+#include <stdlib.h>
+#include <math.h>
+#include <mpi.h>
 
 #include <Random123/philox.h>
 #include <Random123/uniform.hpp>

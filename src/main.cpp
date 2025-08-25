@@ -1,14 +1,14 @@
-#include <cstdlib>
-#include <list>
-#include <set>
-#include <vector>
-#include <cmath>
-#include <time.h>
-#include <ctime>
 #include <iostream>
 #include <fstream>
-
+#include <vector>
+#include <list>
+#include <set>
+#include <cmath>
+#include <cstdlib>
+#include <ctime>
+#include <time.h>
 #include <sys/stat.h>
+
 #include "./helper.hpp"
 
 #define DEFAULT_POWER 3
@@ -65,7 +65,6 @@ void parse_args(int argc, char **argv, int *power, dist_type_t *dist_type) {
     *power = DEFAULT_POWER;
     *dist_type = DIST_UNKNOWN;
 
-    
     if (argc > 1) {
         if (strcmp(argv[1], "box") == 0)
         *dist_type = DIST_BOX;
