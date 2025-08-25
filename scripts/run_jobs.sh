@@ -30,6 +30,6 @@ done
             --job-name=exp_np${np} \
             --output=exp_np${np}_%j.out \
             --error=exp_np${np}_%j.err \
-            ../scripts/run_experiment.sh $np $pp
+            ../scripts/run_experiment.sh $np torus $pp
     done
 done
