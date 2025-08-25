@@ -313,69 +313,169 @@ void radix_sort_particles(t_particle *particles, int n) {
 
 
 int distribute_particles(t_particle **particles, int *particle_vector_size, int nprocs){
-    //std::sort(*particles, *particles + *particle_vector_size, compare_particles);
-    radix_sort_particles(*particles, *particle_vector_size);    
-    //print_particles(*particles, *particle_vector_size, 0);
+    // 1) Ordena localmente pelas keys (você já fazia)
+    radix_sort_particles(*particles, *particle_vector_size);
 
-    int *send_counts = (int*)calloc(nprocs, sizeof(int));
-    int dest;   
-    
-    int bits_needed = 0;
-    int tmp = nprocs - 1;
-    while (tmp > 0) {
-        bits_needed++;
-        tmp >>= 1;
-    }
-
-    for (int i = 0; i < *particle_vector_size; i++){
-        long long key = (*particles)[i].key;
-        int B = 3 * MAX_DEPTH;               
-        unsigned long long key64 = (B < 64) ? ((unsigned long long)key << (64 - B)) : (unsigned long long)key;
-        unsigned __int128 prod = (unsigned __int128)key64 * (unsigned long long)nprocs;
-        dest = (int)(prod >> 64);
-        send_counts[dest]++;
-    }
-
-    int *send_disp = (int*)malloc(nprocs * sizeof(int));
-    send_disp[0] = 0;
-    for (int i = 1; i < nprocs; i++)
-        send_disp[i] = send_disp[i-1] + send_counts[i-1];
-
-    int *recv_counts = (int*)malloc(nprocs * sizeof(int));
-    MPI_Alltoall(send_counts, 1, MPI_INT, recv_counts, 1, MPI_INT, MPI_COMM_WORLD);
-
-    int total_recv = 0;
-    int *recv_disp = (int*)malloc(nprocs * sizeof(int));
-    recv_disp[0] = 0;
-    for (int i = 0; i < nprocs; i++){
-        if (i > 0) recv_disp[i] = recv_disp[i-1] + recv_counts[i-1];
-        total_recv += recv_counts[i];
-    }
-
-    t_particle *recv_buffer = (t_particle*)malloc(total_recv * sizeof(t_particle));
-
-    MPI_Alltoallv(*particles, send_counts, send_disp, MPI_particle,
-                  recv_buffer, recv_counts, recv_disp, MPI_particle,
-                  MPI_COMM_WORLD);
-    
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    printf("Rank %d, Number Particles: %d\n", rank, total_recv);
-    for(int i = 0; i < total_recv; i++){
-        recv_buffer[i].mpi_rank = rank;  
+    const int local_n = *particle_vector_size;
+
+    // 2) Amostragem local (R regular samples; ex.: nprocs-1)
+    //    Se local_n < nprocs, pegue no máximo local_n amostras
+    int Rs = std::max(1, std::min(nprocs - 1, std::max(1, local_n / std::max(1, (int)std::floor((double)local_n / (nprocs))))));
+    std::vector<long long> local_samples;
+    local_samples.reserve(Rs);
+    if (local_n > 0) {
+        for (int i = 1; i <= Rs; ++i) {
+            // posições igualmente espaçadas dentro do vetor local
+            int idx = (int)((1.0 * i * local_n) / (Rs + 1));
+            if (idx >= local_n) idx = local_n - 1;
+            local_samples.push_back((*particles)[idx].key);
+        }
     }
-                  
+
+    // 3) Reunir contagens e amostras no root
+    std::vector<int> recvcounts, displs;
+    int root = 0;
+    int sendcount = (int)local_samples.size();
+    if (rank == root) recvcounts.resize(nprocs);
+    MPI_Gather(&sendcount, 1, MPI_INT,
+               rank == root ? recvcounts.data() : nullptr, 1, MPI_INT,
+               root, MPI_COMM_WORLD);
+
+    int total_samples = 0;
+    if (rank == root) {
+        displs.resize(nprocs, 0);
+        for (int i = 0; i < nprocs; ++i) {
+            displs[i] = total_samples;
+            total_samples += recvcounts[i];
+        }
+    }
+
+    std::vector<long long> all_samples;
+    if (rank == root) all_samples.resize(total_samples);
+
+    MPI_Gatherv(local_samples.data(), sendcount, MPI_LONG_LONG_INT,
+                rank == root ? all_samples.data() : nullptr,
+                rank == root ? recvcounts.data() : nullptr,
+                rank == root ? displs.data() : nullptr,
+                MPI_LONG_LONG_INT,
+                root, MPI_COMM_WORLD);
+
+    // 4) Root escolhe splitters e faz broadcast
+    std::vector<long long> splitters; // tamanho nprocs-1
+    if (rank == root) {
+        std::sort(all_samples.begin(), all_samples.end());
+        splitters.resize(std::max(0, nprocs - 1));
+        // escolhe quantis aproximados
+        for (int i = 1; i < nprocs; ++i) {
+            // posição do i-ésimo quantil (i/nprocs)
+            long long pos = (long long)std::llround((double)i * (all_samples.size()) / nprocs);
+            if (pos <= 0) pos = 1;
+            if (pos >= (long long)all_samples.size()) pos = (long long)all_samples.size() - 1;
+            splitters[i - 1] = all_samples[(size_t)pos - 1];
+        }
+    } else {
+        splitters.resize(std::max(0, nprocs - 1));
+    }
+
+    if (nprocs > 1) {
+        MPI_Bcast(splitters.data(), (int)splitters.size(), MPI_LONG_LONG_INT, root, MPI_COMM_WORLD);
+    }
+
+    // 5) Particiona por splitters com upper_bound (dados já ordenados)
+    // buckets: 0..nprocs-1
+    std::vector<int> sendcounts(nprocs, 0), sdispls(nprocs, 0);
+    if (local_n > 0 && nprocs > 1) {
+        std::vector<int> cuts; cuts.reserve(nprocs+1);
+        cuts.push_back(0);
+        // encontra cortes via busca binária
+        for (int i = 0; i < (int)splitters.size(); ++i) {
+            long long s = splitters[i];
+            t_particle keyprobe; keyprobe.key = s;
+            // upper_bound em array de structs comparando só key:
+            int pos = (int)(std::upper_bound(
+                *particles, *particles + local_n,
+                keyprobe,
+                [](const t_particle& lhs, const t_particle& rhs){
+                    return lhs.key < rhs.key;
+                }
+            ) - *particles);
+            cuts.push_back(pos);
+        }
+        cuts.push_back(local_n);
+
+        for (int b = 0; b < nprocs; ++b) {
+            int begin = cuts[b];
+            int end   = cuts[b+1];
+            sendcounts[b] = std::max(0, end - begin);
+        }
+    } else {
+        // nprocs==1 ou local_n==0
+        sendcounts[0] = local_n;
+    }
+    for (int i = 1; i < nprocs; ++i) sdispls[i] = sdispls[i-1] + sendcounts[i-1];
+
+    // 6) Descobre recvcounts via Alltoall
+    std::vector<int> recvcounts2(nprocs, 0), rdispls(nprocs, 0);
+    MPI_Alltoall(sendcounts.data(), 1, MPI_INT, recvcounts2.data(), 1, MPI_INT, MPI_COMM_WORLD);
+    for (int i = 1; i < nprocs; ++i) rdispls[i] = rdispls[i-1] + recvcounts2[i-1];
+    int recv_total = 0; for (int x: recvcounts2) recv_total += x;
+
+    // 7) Monta buffer de envio por buckets (dados já ordenados => cópias contíguas)
+    std::vector<t_particle> sendbuf(sdispls.back() + sendcounts.back());
+    if (local_n > 0) {
+        if (nprocs == 1) {
+            std::memcpy(sendbuf.data(), *particles, local_n * sizeof(t_particle));
+        } else {
+            // reconstruir os mesmos 'cuts' para copiar fatias
+            std::vector<int> cuts; cuts.reserve(nprocs+1);
+            cuts.push_back(0);
+            for (int i = 0; i < (int)splitters.size(); ++i) {
+                long long s = splitters[i];
+                t_particle keyprobe; keyprobe.key = s;
+                int pos = (int)(std::upper_bound(
+                    *particles, *particles + local_n,
+                    keyprobe,
+                    [](const t_particle& lhs, const t_particle& rhs){
+                        return lhs.key < rhs.key;
+                    }
+                ) - *particles);
+                cuts.push_back(pos);
+            }
+            cuts.push_back(local_n);
+
+            for (int b = 0; b < nprocs; ++b) {
+                int begin = cuts[b], end = cuts[b+1];
+                int amt = end - begin;
+                if (amt > 0) {
+                    std::memcpy(sendbuf.data() + sdispls[b],
+                                *particles + begin,
+                                amt * sizeof(t_particle));
+                }
+            }
+        }
+    }
+
+    // 8) Alltoallv final
+    std::vector<t_particle> recvbuf(recv_total);
+    MPI_Alltoallv(sendbuf.data(), sendcounts.data(), sdispls.data(), MPI_particle,
+                  recvbuf.data(), recvcounts2.data(), rdispls.data(), MPI_particle,
+                  MPI_COMM_WORLD);
+
+    // 9) Ajusta rank nos recebidos e substitui buffer local
+    for (auto &p : recvbuf) p.mpi_rank = rank;
+
     free(*particles);
-    *particles = recv_buffer;
-    *particle_vector_size = total_recv;
+    t_particle *newbuf = (t_particle*)malloc(recvbuf.size() * sizeof(t_particle));
+    std::memcpy(newbuf, recvbuf.data(), recvbuf.size() * sizeof(t_particle));
+    *particles = newbuf;
+    *particle_vector_size = (int)recvbuf.size();
 
-
-    free(send_counts);
-    free(send_disp);
-    free(recv_counts);
-    free(recv_disp);
+    printf("Rank %d, Number Particles: %d\n", rank, *particle_vector_size);
     return 0;
 }
+
 
 
 int redistribute_equal_counts(t_particle **particles, int *particle_vector_size, int nprocs) {
