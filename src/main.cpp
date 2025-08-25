@@ -13,13 +13,15 @@
 
 #define DEFAULT_POWER 3
 
-void setup_particles_box_length(int power, int nprocs, int rank, int *length_per_rank, double *box_length, long long *total_particles, double *RAM_GB) {
+void setup_particles_box_length(int power, int nprocs, int rank, int *length_per_rank, double *box_length, long long *total_particles, double *RAM_GB, int *major_r, int *minor_r) {
     long long slice = (long long)(pow(10,power) / nprocs);
     *total_particles = ((1 + nprocs) * nprocs / 2) * slice;
     *RAM_GB = (*total_particles * 40.0) / 1e9; // sizeof(t_particle) is 36, but it can be considered as 40.
     *box_length = pow(10, power);
-    *box_length = 700;
     *length_per_rank = (rank+1) * slice;
+    *major_r = 4 * pow(10, power-1);
+    *minor_r = 2 * pow(10, power-1);
+
 
     if (rank == nprocs - 1) {
         *length_per_rank += *total_particles % nprocs;
@@ -43,10 +45,6 @@ void log_results(int rank, int power, long long total_particles, int length_per_
     int file_exists = (stat("../results.csv", &buffer) == 0);
 
     FILE *f = fopen("../results.csv", "a");
-    if (!f) {
-        perror("Erro ao abrir arquivo para escrita");
-        return;
-    }
 
     if (!file_exists) {
         fprintf(f, "datetime,power,total_particles,length_per_rank,num_procs,box_length,RAM_GB,execution_time\n");
@@ -93,7 +91,7 @@ int main(int argc, char **argv){
     dist_type_t dist_type;
     int power;
     double box_length;
-    int major_r = 200, minor_r = 100;
+    int major_r, minor_r;
     double start_time, end_time;
     char filename[128];
     double RAM_GB;
@@ -109,7 +107,7 @@ int main(int argc, char **argv){
     parse_args(argc, argv, &power, &dist_type);
     length_vector = (int *)malloc(nprocs*sizeof(int));
 
-    setup_particles_box_length(power, nprocs, rank, &length_per_rank, &box_length, &total_particles, &RAM_GB);
+    setup_particles_box_length(power, nprocs, rank, &length_per_rank, &box_length, &total_particles, &RAM_GB, &major_r , &minor_r);
 
     // Everybody need to know howm much much particles each other have. 
     MPI_Allgather(&length_per_rank, 1, MPI_INT, length_vector, 1, MPI_INT, MPI_COMM_WORLD);
@@ -120,21 +118,21 @@ int main(int argc, char **argv){
             box_distribution(&rank_array, length_per_rank, box_length);
             break;
         case DIST_TORUS:
-            torus_distribution(&rank_array, length_per_rank, major_r, minor_r);
-            box_length = 2*(major_r + minor_r);
+            torus_distribution(&rank_array, length_per_rank, major_r, minor_r, box_length);
             break;
     }
     
     MPI_Barrier(MPI_COMM_WORLD);
     start_time = MPI_Wtime();
 
-    box_length = 2*(major_r + minor_r);
     generate_particles_keys(rank_array, length_per_rank, box_length);
-    //distribute_particles(&rank_array, &length_per_rank, nprocs);
-    redistribute_equal_counts(&rank_array, &length_per_rank, nprocs);
-    if(rank == 0){
-        print_particles(rank_array, length_per_rank, 0);
-    }
+    
+    //if(rank == 0){
+    //    print_particles(rank_array, length_per_rank, 0);
+    //}
+    
+    distribute_particles(&rank_array, &length_per_rank, nprocs);
+    //redistribute_equal_counts(&rank_array, &length_per_rank, nprocs);
     
     // Update length_vector
     MPI_Allgather(&length_per_rank, 1, MPI_INT, length_vector, 1, MPI_INT, MPI_COMM_WORLD);

@@ -82,9 +82,10 @@ int box_distribution(t_particle **particle_array, int count, double box_length){
     return 0;
 }
 
-int torus_distribution(t_particle **particle_array, int count, double major_r, double minor_r){
+int torus_distribution(t_particle **particle_array, int count, double major_r, double minor_r, double box_length){
     int p_rank;
     double theta, phi, r;
+    double center = box_length / 2.0;
 
     MPI_Comm_rank(MPI_COMM_WORLD, &p_rank);
 
@@ -115,13 +116,9 @@ int torus_distribution(t_particle **particle_array, int count, double major_r, d
         rnum = rng(c, k);
         r = minor_r * sqrt(r123::u01<double>(rnum.v[0]));
 
-        (*particle_array)[i].coord[0] = (major_r + r * cos(phi)) * cos(theta);
-        (*particle_array)[i].coord[1] = (major_r + r * cos(phi)) * sin(theta);
-        (*particle_array)[i].coord[2] = r * sin(phi);
-
-        (*particle_array)[i].coord[0] += major_r + minor_r;
-        (*particle_array)[i].coord[1] += major_r + minor_r;
-        (*particle_array)[i].coord[2] += minor_r;
+        (*particle_array)[i].coord[0] = center + (major_r + r * cos(phi)) * cos(theta);
+        (*particle_array)[i].coord[1] = center + (major_r + r * cos(phi)) * sin(theta);
+        (*particle_array)[i].coord[2] = center + r * sin(phi);
     }
 
     return 0;
@@ -383,7 +380,6 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
 
 int redistribute_equal_counts(t_particle **particles, int *particle_vector_size, int nprocs) {
     int rank;
-    radix_sort_particles(*particles, *particle_vector_size);    
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     int local_n = *particle_vector_size;
