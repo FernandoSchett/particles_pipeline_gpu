@@ -83,8 +83,8 @@ int box_distribution(t_particle **particle_array, int count, double box_length){
 }
 
 int torus_distribution(t_particle **particle_array, int count, double major_r, double minor_r){
-    int p_rank, rep;
-    double outer_dist, inner_dist, temp_x, temp_y, temp_z, ran_dist, inplane_dist;
+    int p_rank;
+    double theta, phi, r;
 
     MPI_Comm_rank(MPI_COMM_WORLD, &p_rank);
 
@@ -94,36 +94,34 @@ int torus_distribution(t_particle **particle_array, int count, double major_r, d
     RNG::ukey_type uk={{}};
     uk[0] = p_rank;
     RNG::key_type k=uk;
-    RNG::ctr_type r;
+    RNG::ctr_type rnum;
 
     c[0] = 25082025;
     c[1] = 85712394;
 
     for (int i = 0; i < count; i++){
-        rep = 1;
-        while (rep == 1){
-            outer_dist = major_r + minor_r;
-            inner_dist = major_r - minor_r;
-    
-            c[0] += 1;
-            c[1] += 1;
-            r = rng(c, k);
-            temp_x = (2.*r123::u01<double>(r.v[0]) - 1.) * outer_dist;
-            temp_y = (2.*r123::u01<double>(r.v[1]) - 1.) * outer_dist;
-            ran_dist = sqrt(temp_x*temp_x + temp_y*temp_y);
-    
-            if ((ran_dist <= outer_dist) && (ran_dist >= inner_dist)){
-                temp_z = (2.*r123::u01<double>(r.v[2]) - 1.) * minor_r;
-                inplane_dist = sqrt((ran_dist - major_r)*(ran_dist - major_r) + temp_z*temp_z);
+        c[0] += 1;
+        c[1] += 1;
+        rnum = rng(c, k);
+        theta = 2.0 * M_PI * r123::u01<double>(rnum.v[0]);
 
-                if (inplane_dist <= minor_r){
-                    (*particle_array)[i].coord[0] = temp_x;
-                    (*particle_array)[i].coord[1] = temp_y;
-                    (*particle_array)[i].coord[2] = temp_z;
-                    rep = 0;
-                }
-            } 
-        }
+        c[0] += 1;
+        c[1] += 1;
+        rnum = rng(c, k);
+        phi = 2.0 * M_PI * r123::u01<double>(rnum.v[0]);
+
+        c[0] += 1;
+        c[1] += 1;
+        rnum = rng(c, k);
+        r = minor_r * sqrt(r123::u01<double>(rnum.v[0]));
+
+        (*particle_array)[i].coord[0] = (major_r + r * cos(phi)) * cos(theta);
+        (*particle_array)[i].coord[1] = (major_r + r * cos(phi)) * sin(theta);
+        (*particle_array)[i].coord[2] = r * sin(phi);
+
+        (*particle_array)[i].coord[0] += major_r + minor_r;
+        (*particle_array)[i].coord[1] += major_r + minor_r;
+        (*particle_array)[i].coord[2] += minor_r;
     }
 
     return 0;
@@ -365,7 +363,7 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
     
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    //printf("Rank %d, Number Particles: %d\n", rank, total_recv);
+    printf("Rank %d, Number Particles: %d\n", rank, total_recv);
     for(int i = 0; i < total_recv; i++){
         recv_buffer[i].mpi_rank = rank;  
     }
@@ -373,7 +371,7 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
     free(*particles);
     *particles = recv_buffer;
     *particle_vector_size = total_recv;
-    
+
 
     free(send_counts);
     free(send_disp);
@@ -385,6 +383,8 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
 
 int redistribute_equal_counts(t_particle **particles, int *particle_vector_size, int nprocs) {
     int rank;
+    radix_sort_particles(*particles, *particle_vector_size);    
+
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     int local_n = *particle_vector_size;
     std::vector<int> counts(nprocs, 0);

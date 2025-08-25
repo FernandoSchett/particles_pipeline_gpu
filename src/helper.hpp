@@ -20,6 +20,8 @@ typedef struct particle{
     double coord[3];
 } t_particle;
 
+typedef enum {DIST_BOX, DIST_TORUS, DIST_UNKNOWN} dist_type_t;
+
 #define NPROPS_PARTICLE 3
 #define MAX_DEPTH 15
 

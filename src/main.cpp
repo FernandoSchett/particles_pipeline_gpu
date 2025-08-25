@@ -18,6 +18,7 @@ void setup_particles_box_length(int power, int nprocs, int rank, int *length_per
     *total_particles = ((1 + nprocs) * nprocs / 2) * slice;
     *RAM_GB = (*total_particles * 40.0) / 1e9; // sizeof(t_particle) is 36, but it can be considered as 40.
     *box_length = pow(10, power);
+    *box_length = 700;
     *length_per_rank = (rank+1) * slice;
 
     if (rank == nprocs - 1) {
@@ -62,18 +63,39 @@ void log_results(int rank, int power, long long total_particles, int length_per_
     fclose(f);
 }
 
+void parse_args(int argc, char **argv, int *power, dist_type_t *dist_type) {
+    *power = DEFAULT_POWER;
+    *dist_type = DIST_UNKNOWN;
+
+    
+    if (argc > 1) {
+        if (strcmp(argv[1], "box") == 0)
+        *dist_type = DIST_BOX;
+        else if (strcmp(argv[1], "torus") == 0)
+        *dist_type = DIST_TORUS;
+    }
+    
+    if (*dist_type == DIST_UNKNOWN) {
+        *dist_type = DIST_BOX;
+    }
+    
+    if (argc > 2) {
+        *power = atoi(argv[2]);
+    }
+}
 
 int main(int argc, char **argv){
     int rank, nprocs;
     int length_per_rank, total_length;
+    long long total_particles;
     int *length_vector;
+    t_particle *rank_array;
+    dist_type_t dist_type;
     int power;
     double box_length;
+    int major_r = 200, minor_r = 100;
     double start_time, end_time;
-    t_particle *rank_array;
     char filename[128];
-
-    long long total_particles;
     double RAM_GB;
 
     MPI_Init(&argc, &argv);
@@ -83,29 +105,37 @@ int main(int argc, char **argv){
     // You can now use MPI_particle as an input to MPI_Datatype during MPI calls.
     register_MPI_Particle(&MPI_particle);
 
-    power = DEFAULT_POWER; 
-    if (argc > 1) {
-        power = atoi(argv[1]);
-    }
 
+    parse_args(argc, argv, &power, &dist_type);
     length_vector = (int *)malloc(nprocs*sizeof(int));
 
     setup_particles_box_length(power, nprocs, rank, &length_per_rank, &box_length, &total_particles, &RAM_GB);
 
     // Everybody need to know howm much much particles each other have. 
     MPI_Allgather(&length_per_rank, 1, MPI_INT, length_vector, 1, MPI_INT, MPI_COMM_WORLD);
-
     allocate_particle(&rank_array, length_per_rank);
-    //box_distribution(&rank_array, length_per_rank, box_length);
-    torus_distribution(&rank_array, length_per_rank, 4.0, 2.0);
 
+    switch(dist_type){
+        case DIST_BOX:
+            box_distribution(&rank_array, length_per_rank, box_length);
+            break;
+        case DIST_TORUS:
+            torus_distribution(&rank_array, length_per_rank, major_r, minor_r);
+            box_length = 2*(major_r + minor_r);
+            break;
+    }
+    
     MPI_Barrier(MPI_COMM_WORLD);
     start_time = MPI_Wtime();
 
+    box_length = 2*(major_r + minor_r);
     generate_particles_keys(rank_array, length_per_rank, box_length);
-    distribute_particles(&rank_array, &length_per_rank, nprocs);
-    //redistribute_equal_counts(&rank_array, &length_per_rank, nprocs);
-
+    //distribute_particles(&rank_array, &length_per_rank, nprocs);
+    redistribute_equal_counts(&rank_array, &length_per_rank, nprocs);
+    if(rank == 0){
+        print_particles(rank_array, length_per_rank, 0);
+    }
+    
     // Update length_vector
     MPI_Allgather(&length_per_rank, 1, MPI_INT, length_vector, 1, MPI_INT, MPI_COMM_WORLD);
 

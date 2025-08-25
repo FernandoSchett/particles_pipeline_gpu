@@ -2,6 +2,7 @@ import numpy as np
 import struct
 import matplotlib
 import matplotlib.pyplot as plt
+import os
 
 def read_binary(filename):
     f = open(filename, "rb")
@@ -28,8 +29,15 @@ def read_binary(filename):
         coord_array[i][2] = struct.unpack('d', chunk)[0]
     return particle_count, rank_array, coord_array
     
+files = os.listdir("./build")
+print(files)
+par_file = ""
+for f in files:
+    if f.startswith("particle_file"):
+        par_file = os.path.join("./build", f)
+        break
 
-particle_count, rank_array, coord_array = read_binary("./build/particle_file")
+particle_count, rank_array, coord_array = read_binary(par_file)
 
 fig = plt.figure()
 ax = fig.add_subplot(projection='3d')
