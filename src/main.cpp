@@ -31,7 +31,8 @@ int main(int argc, char **argv){
     MPI_Allgather(&length_per_rank, 1, MPI_INT, length_vector, 1, MPI_INT, MPI_COMM_WORLD);
 
     allocate_particle(&rank_array, length_per_rank);
-    box_distribution(&rank_array, length_per_rank, box_length);
+    //box_distribution(&rank_array, length_per_rank, box_length);
+    torus_distribution(&rank_array, length_per_rank, 4.0, 2.0);
 
 /*
     for (int i = 0; i < length_per_rank; i++){

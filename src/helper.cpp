@@ -80,6 +80,53 @@ int box_distribution(t_particle **particle_array, int count, double box_length){
     return 0;
 }
 
+int torus_distribution(t_particle **particle_array, int count, double major_r, double minor_r){
+    int p_rank, rep;
+    double outer_dist, inner_dist, temp_x, temp_y, temp_z, ran_dist, inplane_dist;
+
+    MPI_Comm_rank(MPI_COMM_WORLD, &p_rank);
+
+    typedef r123::Philox4x32 RNG;
+    RNG rng;
+    RNG::ctr_type c={{}};
+    RNG::ukey_type uk={{}};
+    uk[0] = p_rank;
+    RNG::key_type k=uk;
+    RNG::ctr_type r;
+
+    c[0] = 25082025;
+    c[1] = 85712394;
+
+    for (int i = 0; i < count; i++){
+        rep = 1;
+        while (rep == 1){
+            outer_dist = major_r + minor_r;
+            inner_dist = major_r - minor_r;
+    
+            c[0] += 1;
+            c[1] += 1;
+            r = rng(c, k);
+            temp_x = (2.*r123::u01<double>(r.v[0]) - 1.) * outer_dist;
+            temp_y = (2.*r123::u01<double>(r.v[1]) - 1.) * outer_dist;
+            ran_dist = sqrt(temp_x*temp_x + temp_y*temp_y);
+    
+            if ((ran_dist <= outer_dist) && (ran_dist >= inner_dist)){
+                temp_z = (2.*r123::u01<double>(r.v[2]) - 1.) * minor_r;
+                inplane_dist = sqrt((ran_dist - major_r)*(ran_dist - major_r) + temp_z*temp_z);
+
+                if (inplane_dist <= minor_r){
+                    (*particle_array)[i].coord[0] = temp_x;
+                    (*particle_array)[i].coord[1] = temp_y;
+                    (*particle_array)[i].coord[2] = temp_z;
+                    rep = 0;
+                }
+            } 
+        }
+    }
+
+    return 0;
+}
+
 int parallel_write_to_file(t_particle *particle_array, int *count, char *filename){
     int access_mode;
     MPI_File fh;
