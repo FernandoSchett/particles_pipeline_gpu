@@ -380,9 +380,11 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
 
 int redistribute_equal_counts(t_particle **particles, int *particle_vector_size, int nprocs) {
     int rank;
-
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
     int local_n = *particle_vector_size;
+
+    radix_sort_particles(*particles, *particle_vector_size);    
     std::vector<int> counts(nprocs, 0);
     MPI_Allgather(&local_n, 1, MPI_INT, counts.data(), 1, MPI_INT, MPI_COMM_WORLD);
 
@@ -403,8 +405,10 @@ int redistribute_equal_counts(t_particle **particles, int *particle_vector_size,
         if (diff > 0) surplus.push_back({i, diff});
         else if (diff < 0) deficit.push_back({i, -diff});
     }
-
-    if (surplus.empty() && deficit.empty()) return 0;
+    if (surplus.empty() && deficit.empty()) {
+        for (int i = 0; i < local_n; ++i) (*particles)[i].mpi_rank = rank;
+        return 0;
+    }
 
     std::vector<int> S(nprocs * nprocs, 0);
     size_t si = 0, di = 0;
@@ -431,16 +435,44 @@ int redistribute_equal_counts(t_particle **particles, int *particle_vector_size,
     int send_total = 0, recv_total = 0;
     for (int i = 0; i < nprocs; ++i) { send_total += sendcounts[i]; recv_total += recvcounts[i]; }
 
-    int keep = local_n - send_total;
-    if (keep < 0) { MPI_Abort(MPI_COMM_WORLD, 1); }
+    int L = 0;                        
+    for (int dst = 0; dst < rank; ++dst) L += sendcounts[dst];
+    int R = 0;                         
+    for (int dst = rank+1; dst < nprocs; ++dst) R += sendcounts[dst];
+
+    int left_start  = 0;
+    int keep_start  = left_start + L;
+    int right_start = local_n - R;     
+    int keep_end    = right_start - 1;
+    int keep        = keep_end - keep_start + 1;
+
+    if (keep < 0 || keep != (local_n - send_total)) {
+        fprintf(stderr, "Rank %d: corte invalido (keep=%d, local=%d, send_total=%d)\n",
+                rank, keep, local_n, send_total);
+        MPI_Abort(MPI_COMM_WORLD, 3);
+    }
 
     std::vector<t_particle> sendbuf(send_total);
-    int cursor = 0;
-    for (int dst = 0; dst < nprocs; ++dst) {
+
+    int left_cursor = 0;
+    for (int dst = 0; dst < rank; ++dst) {
         int amt = sendcounts[dst];
         if (amt > 0) {
-            std::copy_n((*particles) + keep + cursor, amt, sendbuf.data() + sdispls[dst]);
-            cursor += amt;
+            std::copy_n((*particles) + (left_start + left_cursor),
+                        amt,
+                        sendbuf.data() + sdispls[dst]);
+            left_cursor += amt;
+        }
+    }
+
+    int right_cursor = 0;
+    for (int dst = rank+1; dst < nprocs; ++dst) {
+        int amt = sendcounts[dst];
+        if (amt > 0) {
+            std::copy_n((*particles) + (right_start + right_cursor),
+                        amt,
+                        sendbuf.data() + sdispls[dst]);
+            right_cursor += amt;
         }
     }
 
@@ -453,19 +485,21 @@ int redistribute_equal_counts(t_particle **particles, int *particle_vector_size,
 
     std::vector<t_particle> balanced;
     balanced.reserve(keep + recv_total);
-    balanced.insert(balanced.end(), (*particles), (*particles) + keep);
-    balanced.insert(balanced.end(), recvbuf.begin(), recvbuf.end());
 
-    if ((int)balanced.size() != target[rank]) {
-        fprintf(stderr, "Rank %d: final %zu != target %d\n", rank, balanced.size(), target[rank]);
-        MPI_Abort(MPI_COMM_WORLD, 2);
+    if (keep > 0) {
+        balanced.insert(balanced.end(),
+                        (*particles) + keep_start,
+                        (*particles) + keep_start + keep);
     }
+    balanced.insert(balanced.end(), recvbuf.begin(), recvbuf.end());
 
     free(*particles);
     t_particle *newbuf = (t_particle*)malloc(balanced.size() * sizeof(t_particle));
     std::memcpy(newbuf, balanced.data(), balanced.size() * sizeof(t_particle));
     *particles = newbuf;
     *particle_vector_size = (int)balanced.size();
+
+
     printf("Rank %d, Number Particles: %d\n", rank, *particle_vector_size);
     return 0;
 }
