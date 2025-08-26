@@ -306,153 +306,6 @@ void radix_sort_particles(t_particle *particles, int n) {
     free(tmp);
 }
 
-
-int distribute_particles(t_particle **particles, int *particle_vector_size, int nprocs){
-    radix_sort_particles(*particles, *particle_vector_size);
-
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    const int local_n = *particle_vector_size;
-
-    int Rs = std::max(1, std::min(nprocs - 1, std::max(1, local_n / std::max(1, (int)std::floor((double)local_n / (nprocs))))));
-    std::vector<long long> local_samples;
-    local_samples.reserve(Rs);
-    if (local_n > 0) {
-        for (int i = 1; i <= Rs; ++i) {
-            int idx = (int)((1.0 * i * local_n) / (Rs + 1));
-            if (idx >= local_n) idx = local_n - 1;
-            local_samples.push_back((*particles)[idx].key);
-        }
-    }
-
-    std::vector<int> recvcounts, displs;
-    int root = 0;
-    int sendcount = (int)local_samples.size();
-    if (rank == root) recvcounts.resize(nprocs);
-    MPI_Gather(&sendcount, 1, MPI_INT,
-               rank == root ? recvcounts.data() : nullptr, 1, MPI_INT,
-               root, MPI_COMM_WORLD);
-
-    int total_samples = 0;
-    if (rank == root) {
-        displs.resize(nprocs, 0);
-        for (int i = 0; i < nprocs; ++i) {
-            displs[i] = total_samples;
-            total_samples += recvcounts[i];
-        }
-    }
-
-    std::vector<long long> all_samples;
-    if (rank == root) all_samples.resize(total_samples);
-
-    MPI_Gatherv(local_samples.data(), sendcount, MPI_LONG_LONG_INT,
-                rank == root ? all_samples.data() : nullptr,
-                rank == root ? recvcounts.data() : nullptr,
-                rank == root ? displs.data() : nullptr,
-                MPI_LONG_LONG_INT,
-                root, MPI_COMM_WORLD);
-
-    std::vector<long long> splitters; 
-    if (rank == root) {
-        std::sort(all_samples.begin(), all_samples.end());
-        splitters.resize(std::max(0, nprocs - 1));
-        for (int i = 1; i < nprocs; ++i) {
-            long long pos = (long long)std::llround((double)i * (all_samples.size()) / nprocs);
-            if (pos <= 0) pos = 1;
-            if (pos >= (long long)all_samples.size()) pos = (long long)all_samples.size() - 1;
-            splitters[i - 1] = all_samples[(size_t)pos - 1];
-        }
-    } else {
-        splitters.resize(std::max(0, nprocs - 1));
-    }
-
-    if (nprocs > 1) {
-        MPI_Bcast(splitters.data(), (int)splitters.size(), MPI_LONG_LONG_INT, root, MPI_COMM_WORLD);
-    }
-
-    std::vector<int> sendcounts(nprocs, 0), sdispls(nprocs, 0);
-    if (local_n > 0 && nprocs > 1) {
-        std::vector<int> cuts; cuts.reserve(nprocs+1);
-        cuts.push_back(0);
-        for (int i = 0; i < (int)splitters.size(); ++i) {
-            long long s = splitters[i];
-            t_particle keyprobe; keyprobe.key = s;
-            int pos = (int)(std::upper_bound(
-                *particles, *particles + local_n,
-                keyprobe,
-                [](const t_particle& lhs, const t_particle& rhs){
-                    return lhs.key < rhs.key;
-                }
-            ) - *particles);
-            cuts.push_back(pos);
-        }
-        cuts.push_back(local_n);
-
-        for (int b = 0; b < nprocs; ++b) {
-            int begin = cuts[b];
-            int end   = cuts[b+1];
-            sendcounts[b] = std::max(0, end - begin);
-        }
-    } else {
-        sendcounts[0] = local_n;
-    }
-    for (int i = 1; i < nprocs; ++i) sdispls[i] = sdispls[i-1] + sendcounts[i-1];
-
-    std::vector<int> recvcounts2(nprocs, 0), rdispls(nprocs, 0);
-    MPI_Alltoall(sendcounts.data(), 1, MPI_INT, recvcounts2.data(), 1, MPI_INT, MPI_COMM_WORLD);
-    for (int i = 1; i < nprocs; ++i) rdispls[i] = rdispls[i-1] + recvcounts2[i-1];
-    int recv_total = 0; for (int x: recvcounts2) recv_total += x;
-
-    std::vector<t_particle> sendbuf(sdispls.back() + sendcounts.back());
-    if (local_n > 0) {
-        if (nprocs == 1) {
-            std::memcpy(sendbuf.data(), *particles, local_n * sizeof(t_particle));
-        } else {
-            std::vector<int> cuts; cuts.reserve(nprocs+1);
-            cuts.push_back(0);
-            for (int i = 0; i < (int)splitters.size(); ++i) {
-                long long s = splitters[i];
-                t_particle keyprobe; keyprobe.key = s;
-                int pos = (int)(std::upper_bound(
-                    *particles, *particles + local_n,
-                    keyprobe,
-                    [](const t_particle& lhs, const t_particle& rhs){
-                        return lhs.key < rhs.key;
-                    }
-                ) - *particles);
-                cuts.push_back(pos);
-            }
-            cuts.push_back(local_n);
-
-            for (int b = 0; b < nprocs; ++b) {
-                int begin = cuts[b], end = cuts[b+1];
-                int amt = end - begin;
-                if (amt > 0) {
-                    std::memcpy(sendbuf.data() + sdispls[b],
-                                *particles + begin,
-                                amt * sizeof(t_particle));
-                }
-            }
-        }
-    }
-
-    std::vector<t_particle> recvbuf(recv_total);
-    MPI_Alltoallv(sendbuf.data(), sendcounts.data(), sdispls.data(), MPI_particle,
-                  recvbuf.data(), recvcounts2.data(), rdispls.data(), MPI_particle,
-                  MPI_COMM_WORLD);
-
-    for (auto &p : recvbuf) p.mpi_rank = rank;
-
-    free(*particles);
-    t_particle *newbuf = (t_particle*)malloc(recvbuf.size() * sizeof(t_particle));
-    std::memcpy(newbuf, recvbuf.data(), recvbuf.size() * sizeof(t_particle));
-    *particles = newbuf;
-    *particle_vector_size = (int)recvbuf.size();
-
-    printf("Rank %d, Number Particles: %d\n", rank, *particle_vector_size);
-    return 0;
-}
-
 static inline bool key_less(const t_particle& a, const t_particle& b) {
     return (unsigned long long)a.key < (unsigned long long)b.key;
 }
@@ -470,7 +323,7 @@ static inline long long count_leq(const t_particle* particles, int n, unsigned l
     return (long long)(it - first);
 }
 
-int distribute_particles_right(t_particle **particles, int *particle_vector_size, int nprocs){
+int distribute_particles(t_particle **particles, int *particle_vector_size, int nprocs){
     radix_sort_particles(*particles, *particle_vector_size);
 
     int rank;
@@ -493,12 +346,13 @@ int distribute_particles_right(t_particle **particles, int *particle_vector_size
     std::vector<unsigned long long> splitters;
     splitters.reserve(nprocs > 0 ? nprocs - 1 : 0);
 
+    unsigned long long lo_base = gmin;     
     for (int i = 1; i < nprocs; ++i) {
-        long long target = (N_global * i + nprocs - 1) / nprocs; // ceil(i*N/P)
-        if (target <= 0) { splitters.push_back(gmin); continue; }
-        if (target >= N_global) { splitters.push_back(gmax); continue; }
+        long long target = (N_global * i + nprocs - 1) / nprocs; 
 
-        unsigned long long lo = gmin, hi = gmax;
+        unsigned long long lo = lo_base;   
+        unsigned long long hi = gmax;
+
         while (lo < hi) {
             unsigned long long mid = lo + ((hi - lo) >> 1);
             long long c_local = count_leq(*particles, local_n, mid);
@@ -508,6 +362,7 @@ int distribute_particles_right(t_particle **particles, int *particle_vector_size
             else                    lo = mid + 1;
         }
         splitters.push_back(lo);
+        lo_base = lo;  
     }
 
     std::vector<int> sendcounts(nprocs, 0), sdispls(nprocs, 0);

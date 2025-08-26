@@ -41,8 +41,7 @@ void radix_sort_particles(t_particle *particles, int n);
 void run_oct_tree_recursive(t_particle *particles, int count, int depth, long long key_prefix, double box_length, double origin[3]);
 int generate_particles_keys(t_particle *particle_array, int count, double box_length);
 
-int distribute_particles(t_particle **particles, int* particle_vector_size, int nprocs);
-int distribute_particles_right(t_particle **particles, int *particle_vector_size, int nprocs);
+int distribute_particles(t_particle **particles, int *particle_vector_size, int nprocs);
 
 void print_particles(t_particle *particle_array, int size, int rank);
 
