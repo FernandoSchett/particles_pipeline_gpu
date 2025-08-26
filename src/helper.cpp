@@ -267,8 +267,6 @@ void run_oct_tree_recursive(std::vector<t_particle*>& particles, int depth, long
     }
 }
 
-
-
 int generate_particles_keys(t_particle *particle_array, int count, double box_length) {
     std::vector<t_particle*> particles;
     particles.reserve(count);
@@ -323,9 +321,21 @@ static inline long long count_leq(const t_particle* particles, int n, unsigned l
     return (long long)(it - first);
 }
 
-int distribute_particles(t_particle **particles, int *particle_vector_size, int nprocs){
-    radix_sort_particles(*particles, *particle_vector_size);
+struct particle_less {
+    inline bool operator()(const t_particle& a, const t_particle& b) const {
+        return (unsigned long long)a.key < (unsigned long long)b.key;
+    }
+};
 
+struct particle_rightshift {
+    inline unsigned long long operator()(const t_particle& p, unsigned offset) const {
+        return ((unsigned long long)p.key) >> offset;
+    }
+};
+
+int distribute_particles(t_particle **particles, int *particle_vector_size, int nprocs){
+    boost::sort::spreadsort::integer_sort(*particles, *particles + *particle_vector_size, particle_rightshift{}, particle_less{});
+    
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     const int local_n = *particle_vector_size;

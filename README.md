@@ -24,4 +24,4 @@
 
 1. Run:
 
-         sh scripts/run_experiment.sh 
+         sh scripts/run_jobs.sh 

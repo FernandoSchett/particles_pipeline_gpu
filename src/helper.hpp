@@ -12,7 +12,8 @@
 
 #include <Random123/philox.h>
 #include <Random123/uniform.hpp>
-//#include <boost/sort/sort.hpp>
+#include <boost/sort/spreadsort/integer_sort.hpp>
+//#include <boost/sort/spreadsort/spreadsort.hpp>
 
 typedef struct particle{
     int mpi_rank;

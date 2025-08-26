@@ -125,13 +125,13 @@ int main(int argc, char **argv){
     start_time = MPI_Wtime();
 
     generate_particles_keys(rank_array, length_per_rank, box_length);
+    distribute_particles(&rank_array, &length_per_rank, nprocs);
     
     //if(rank == 0){
     //    print_particles(rank_array, length_per_rank, 0);
     //}
     
     //distribute_particles(&rank_array, &length_per_rank, nprocs);
-    distribute_particles_right(&rank_array, &length_per_rank, nprocs);
     
     // Update length_vector
     MPI_Allgather(&length_per_rank, 1, MPI_INT, length_vector, 1, MPI_INT, MPI_COMM_WORLD);
