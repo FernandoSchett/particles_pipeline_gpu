@@ -283,11 +283,6 @@ int generate_particles_keys(t_particle *particle_array, int count, double box_le
     return 0;
 }
 
-
-bool compare_particles(const t_particle &a, const t_particle &b) {
-    return a.key < b.key;
-}
-
 void radix_sort_particles(t_particle *particles, int n) {
     t_particle *tmp = (t_particle*)malloc(n * sizeof(t_particle));
     const int BITS = 64;       
@@ -458,24 +453,29 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
     return 0;
 }
 
+static inline bool key_less(const t_particle& a, const t_particle& b) {
+    return (unsigned long long)a.key < (unsigned long long)b.key;
+}
+
+static inline long long count_leq(const t_particle* particles, int n, unsigned long long val)
+{
+    if (n <= 0) return 0;
+    t_particle probe;
+    probe.key = (long long)val;
+
+    const t_particle* first = particles;
+    const t_particle* last  = particles + n;
+
+    auto it = std::upper_bound(first, last, probe, key_less);
+    return (long long)(it - first);
+}
+
 int distribute_particles_right(t_particle **particles, int *particle_vector_size, int nprocs){
     radix_sort_particles(*particles, *particle_vector_size);
 
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     const int local_n = *particle_vector_size;
-
-    auto count_leq = [&](unsigned long long val)->long long {
-        if (local_n == 0) return 0;
-        t_particle probe; probe.key = (long long)val;
-        const t_particle* first = *particles;
-        const t_particle* last  = *particles + local_n;
-        auto it = std::upper_bound(first, last, probe,
-            [](const t_particle& a, const t_particle& b){
-                return (unsigned long long)a.key < (unsigned long long)b.key;
-            });
-        return (long long)(it - first);
-    };
 
     long long N_local = local_n, N_global = 0;
     MPI_Allreduce(&N_local, &N_global, 1, MPI_LONG_LONG_INT, MPI_SUM, MPI_COMM_WORLD);
@@ -501,13 +501,13 @@ int distribute_particles_right(t_particle **particles, int *particle_vector_size
         unsigned long long lo = gmin, hi = gmax;
         while (lo < hi) {
             unsigned long long mid = lo + ((hi - lo) >> 1);
-            long long c_local = (long long)count_leq(mid);
+            long long c_local = count_leq(*particles, local_n, mid);
             long long c_global = 0;
             MPI_Allreduce(&c_local, &c_global, 1, MPI_LONG_LONG_INT, MPI_SUM, MPI_COMM_WORLD);
             if (c_global >= target) hi = mid;
             else                    lo = mid + 1;
         }
-        splitters.push_back(lo); 
+        splitters.push_back(lo);
     }
 
     std::vector<int> sendcounts(nprocs, 0), sdispls(nprocs, 0);
@@ -520,10 +520,7 @@ int distribute_particles_right(t_particle **particles, int *particle_vector_size
             t_particle probe; probe.key = (long long)s;
             const t_particle* first = *particles;
             const t_particle* last  = *particles + local_n;
-            auto it = std::upper_bound(first, last, probe,
-                [](const t_particle& a, const t_particle& b){
-                    return (unsigned long long)a.key < (unsigned long long)b.key;
-                });
+            auto it = std::upper_bound(first, last, probe, key_less);
             cuts.push_back((int)(it - first));
         }
         cuts.push_back(local_n);
@@ -549,10 +546,7 @@ int distribute_particles_right(t_particle **particles, int *particle_vector_size
             for (unsigned long long s : splitters) {
                 t_particle probe; probe.key = (long long)s;
                 auto it = std::upper_bound(
-                    *particles, *particles + local_n, probe,
-                    [](const t_particle& a, const t_particle& b){
-                        return (unsigned long long)a.key < (unsigned long long)b.key;
-                    });
+                    *particles, *particles + local_n, probe, key_less);
                 cuts.push_back((int)(it - *particles));
             }
             cuts.push_back(local_n);
@@ -585,8 +579,6 @@ int distribute_particles_right(t_particle **particles, int *particle_vector_size
     printf("Rank %d, Number Particles: %d\n", rank, *particle_vector_size);
     return 0;
 }
-
-
 
 void print_particles(t_particle *particle_array, int size, int rank) {        
     for (int i = 0; i < size; i++){ 
