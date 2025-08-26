@@ -8,10 +8,17 @@
          git submodule init
          git submodule update --recursive
 
-3. Run:
+3. (OPTIONAL) If in a supercomputer:
 
-         sh scripts/run_program.sh <number_processes> <power_to_particle_numbers>
+         source scripts/load_modules.sh
+4. Run:
 
+         sh scripts/run_program.sh <number_processes> <initial_distribution> <power_to_particle_numbers>
+
+5. See Results:
+
+            source scripts/setup_py_env.sh
+            python3 visualize.py
 
 ## How reproduce the experiments:
 
