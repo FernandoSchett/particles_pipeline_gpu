@@ -102,7 +102,7 @@ int main(int argc, char **argv){
 
     // aloca particulas na gpu.
     cudaMalloc(&rank_array, length_per_rank*sizeof(t_particle));     
-    
+    cudaMallocHost(&host_array, length_per_rank*sizeof(t_particle));
 
     // allocate_particle(&rank_array, length_per_rank);
 
@@ -129,6 +129,7 @@ int main(int argc, char **argv){
             break;
     }
     
+    cudaDeviceSynchronize();
     cudaMemcpy(host_array, rank_array, length_per_rank * sizeof(t_particle), cudaMemcpyDeviceToHost);
     print_particles(host_array, length_per_rank, rank);
 
