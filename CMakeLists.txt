@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.22)
 set(CMAKE_CXX_STANDARD 20) # Set CPP version
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF) # No compiler extensions
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project(P_SFC VERSION 0.0.1 LANGUAGES CXX)
 

@@ -9,7 +9,7 @@
 #include <time.h>
 #include <sys/stat.h>
 
-#include "./helper.hpp"
+#include "helper.hpp"
 
 #define DEFAULT_POWER 3
 

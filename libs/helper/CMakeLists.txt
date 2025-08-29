@@ -11,7 +11,7 @@ add_library(helper
   src/helper.cpp
 )
 
-# Define what this library needs.
+# Define librarie properties
 target_compile_features(helper PUBLIC cxx_std_20)
 
 target_include_directories(helper
