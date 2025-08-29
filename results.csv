@@ -1,2 +1,8 @@
 datetime,power,total_particles,length_per_rank,num_procs,box_length,RAM_GB,execution_time
 2025-08-29 11:17:13,3,2500,625,4,1000.0,0.00,0.003962
+datetime,power,total_particles,length_per_rank,num_procs,box_length,RAM_GB,execution_time,device
+2025-08-29 14:14:05,3,0,0,0,1000.0,0.00,-0.000000,gpu
+datetime,power,total_particles,length_per_rank,num_procs,box_length,RAM_GB,execution_time,device
+2025-08-29 14:14:20,4,0,0,0,10000.0,0.00,-0.000000,gpu
+datetime,power,total_particles,length_per_rank,num_procs,box_length,RAM_GB,execution_time,device
+2025-08-29 14:15:01,4,0,0,0,10000.0,0.00,-0.000000,gpu

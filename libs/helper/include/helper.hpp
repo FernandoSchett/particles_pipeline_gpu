@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <mpi.h>
+#include <cuda_runtime.h> 
 
 #include <Random123/philox.h>
 #include <Random123/uniform.hpp>
@@ -46,5 +47,7 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
 
 void print_particles(t_particle *particle_array, int size, int rank);
 
-
+// GPU Kernels
+__global__ void box_distribution_kernel(t_particle* particles,int N, double L, unsigned long long seed);
+__global__ void torus_distribution_kernel(t_particle* particles, int N, double major_r, double minor_r, double box_length, unsigned long long seed);
 #endif

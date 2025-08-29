@@ -8,6 +8,7 @@
 #include <ctime>
 #include <time.h>
 #include <sys/stat.h>
+#include <cuda_runtime.h> 
 
 #include "helper.hpp"
 
@@ -82,11 +83,11 @@ void parse_args(int argc, char **argv, int *power, dist_type_t *dist_type) {
 }
 
 int main(int argc, char **argv){
-    int rank, nprocs;
+    int rank = 0, nprocs=1;
     int length_per_rank, total_length;
     long long total_particles;
     int *length_vector;
-    t_particle *rank_array;
+    t_particle *rank_array, *host_array;
     dist_type_t dist_type;
     int power;
     double box_length;
@@ -95,62 +96,57 @@ int main(int argc, char **argv){
     char filename[128];
     double RAM_GB;
 
-    MPI_Init(&argc, &argv);
-    MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-    // You can now use MPI_particle as an input to MPI_Datatype during MPI calls.
-    register_MPI_Particle(&MPI_particle);
-
     parse_args(argc, argv, &power, &dist_type);
-    length_vector = (int *)malloc(nprocs*sizeof(int));
-
     setup_particles_box_length(power, nprocs, rank, &length_per_rank, &box_length, &total_particles, &RAM_GB, &major_r , &minor_r);
 
-    // Everybody need to know howm much much particles each other have. 
-    MPI_Allgather(&length_per_rank, 1, MPI_INT, length_vector, 1, MPI_INT, MPI_COMM_WORLD);
-    allocate_particle(&rank_array, length_per_rank);
 
+    // aloca particulas na gpu.
+    cudaMalloc(&rank_array, length_per_rank*sizeof(t_particle));     
+    
+
+    // allocate_particle(&rank_array, length_per_rank);
+
+
+    // cria as coordenadas na gpu.
+    
+
+    cudaStream_t s = 0;
+    unsigned long long seed = (unsigned long long)time(nullptr) ^ (0x9E3779B97F4A7C15ull * (unsigned long long)(rank + 1));
+    
+    int block = 256;
+    int sms = 0;
+    cudaDeviceGetAttribute(&sms, cudaDevAttrMultiProcessorCount, 0);
+    int maxBlocks = sms * 20;
+    int grid = (length_per_rank + block - 1) / block;
+    if (grid > maxBlocks) grid = maxBlocks;
+    
     switch(dist_type){
         case DIST_BOX:
-            box_distribution(&rank_array, length_per_rank, box_length);
+            box_distribution_kernel<<<grid, block, 0, s>>>(rank_array, length_per_rank, box_length, seed);
             break;
         case DIST_TORUS:
-            torus_distribution(&rank_array, length_per_rank, major_r, minor_r, box_length);
+            torus_distribution_kernel<<<grid, block, 0, s>>>(rank_array, length_per_rank, major_r, minor_r, box_length, seed);
             break;
     }
     
-    MPI_Barrier(MPI_COMM_WORLD);
-    start_time = MPI_Wtime();
+    cudaMemcpy(host_array, rank_array, length_per_rank * sizeof(t_particle), cudaMemcpyDeviceToHost);
+    print_particles(host_array, length_per_rank, rank);
 
-    generate_particles_keys(rank_array, length_per_rank, box_length);
-    distribute_particles(&rank_array, &length_per_rank, nprocs);
+    // cria as keys na gpu.
+    //generate_particles_keys(rank_array, length_per_rank, box_length);
     
-    //if(rank == 0){
-    //    print_particles(rank_array, length_per_rank, 0);
-    //}
-    
+    // distribui as keys na gpu.
     //distribute_particles(&rank_array, &length_per_rank, nprocs);
     
-    // Update length_vector
-    MPI_Allgather(&length_per_rank, 1, MPI_INT, length_vector, 1, MPI_INT, MPI_COMM_WORLD);
+    // cada gpu manda pro host 
 
-    MPI_Barrier(MPI_COMM_WORLD);
-    end_time = MPI_Wtime();
-
-    sprintf(filename, "particle_file_n%d_total%lld", nprocs, total_particles);
-    parallel_write_to_file(rank_array, length_vector, filename);
+    // host escreve em paralelo.
+    //sprintf(filename, "particle_file_n%d_total%lld", nprocs, total_particles);
+    //parallel_write_to_file(rank_array, length_vector, filename);
     
     if(rank == 0)
-        log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, end_time - start_time);
-    
-    total_length = 0;
-    for (int i = 0; i < nprocs; i++){
-        total_length += length_vector[i];
-    }
+        log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, end_time - start_time);    
 
-    free(rank_array);
-    free(length_vector);
-    MPI_Finalize();
+    cudaFree(rank_array);
     return 0;
 }
