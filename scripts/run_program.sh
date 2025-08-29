@@ -12,4 +12,6 @@ cmake ..
 
 cmake --build .
 
+cd src 
+
 mpirun -np $1 ./p_sfc_exe $2 $3
