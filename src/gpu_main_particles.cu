@@ -95,6 +95,9 @@ int main(int argc, char **argv){
     double start_time, end_time;
     char filename[128];
     double RAM_GB;
+    float gen_ms = 0.0f;
+    double kernel_time_sec;
+
 
     parse_args(argc, argv, &power, &dist_type);
     setup_particles_box_length(power, nprocs, rank, &length_per_rank, &box_length, &total_particles, &RAM_GB, &major_r , &minor_r);
@@ -110,9 +113,8 @@ int main(int argc, char **argv){
     // cria as coordenadas na gpu.
     
 
-    cudaStream_t s = 0;
     unsigned long long seed = (unsigned long long)time(nullptr) ^ (0x9E3779B97F4A7C15ull * (unsigned long long)(rank + 1));
-    
+    cudaStream_t s = 0;
     int block = 256;
     int sms = 0;
     cudaDeviceGetAttribute(&sms, cudaDevAttrMultiProcessorCount, 0);
@@ -131,8 +133,22 @@ int main(int argc, char **argv){
     
     // cria as keys na gpu.
     //generate_particles_keys(rank_array, length_per_rank, box_length);
+    cudaEvent_t kStart, kStop;
+
+
+    cudaEventCreate(&kStart);
+    cudaEventCreate(&kStop);
+
+    cudaEventRecord(kStart, s);
     generate_keys_kernel<<<grid, block, 0, s>>>(rank_array, length_per_rank, box_length);
-    
+    cudaEventRecord(kStop, s);
+
+    cudaEventSynchronize(kStop);
+
+    cudaEventElapsedTime(&gen_ms, kStart, kStop);
+    kernel_time_sec = gen_ms / 1000.0;
+
+
     cudaDeviceSynchronize();
     cudaMemcpy(host_array, rank_array, length_per_rank * sizeof(t_particle), cudaMemcpyDeviceToHost);
     print_particles(host_array, length_per_rank, rank);
@@ -148,9 +164,13 @@ int main(int argc, char **argv){
     //parallel_write_to_file(rank_array, length_vector, filename);
     
     if(rank == 0)
-        log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, end_time - start_time);    
+        log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, kernel_time_sec);    
+    
+    cudaEventDestroy(kStart);
+    cudaEventDestroy(kStop);
     
     cudaFreeHost(host_array);
     cudaFree(rank_array);
+    
     return 0;
 }
