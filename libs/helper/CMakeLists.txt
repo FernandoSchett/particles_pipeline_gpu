@@ -4,9 +4,9 @@
 # Library Dependecies
 find_package(Boost REQUIRED)
 find_package(MPI REQUIRED COMPONENTS CXX)
+find_package(CUDAToolkit REQUIRED)
 
 enable_language(CUDA)
-find_package(CUDAToolkit REQUIRED)
 
 # Create TARGET (Helper Library)
 add_library(helper
@@ -19,9 +19,8 @@ set_target_properties(helper PROPERTIES
   CUDA_SEPARABLE_COMPILATION ON
   CUDA_STANDARD 17
   POSITION_INDEPENDENT_CODE ON
-  # CUDA_ARCHITECTURES "86"   # Ampere; ajuste p/ sua GPU(s), ex.: "75;86;89"
+  CUDA_ARCHITECTURES 86
 )
-
 
 target_compile_features(helper PUBLIC cxx_std_20)
 
@@ -37,3 +36,5 @@ target_link_libraries(helper
     third_party::random123
     CUDA::cudart  
 )
+
+

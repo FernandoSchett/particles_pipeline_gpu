@@ -53,3 +53,39 @@ __global__ void torus_distribution_kernel(t_particle* particles, int N, double m
         particles[i].coord[2] = center + r * sphi;
     }
 }
+
+__global__ void generate_keys_kernel(t_particle* particles, int N, double box_length)
+{
+    for (int i = blockIdx.x * blockDim.x + threadIdx.x;
+         i < N;
+         i += blockDim.x * gridDim.x)
+    {
+        double x = particles[i].coord[0];
+        double y = particles[i].coord[1];
+        double z = particles[i].coord[2];
+
+        double ox = 0.0, oy = 0.0, oz = 0.0;
+        double len = box_length;
+
+        unsigned long long key = 0ull;
+
+        #pragma unroll 1
+        for (int d = 0; d < MAX_DEPTH; ++d) {
+            len *= 0.5;                  
+            int oct = 0;
+
+            double cx = ox + len;        
+            double cy = oy + len;
+            double cz = oz + len;
+
+            if (x >= cx) { oct |= 1; ox += len; }
+            if (y >= cy) { oct |= 2; oy += len; }
+            if (z >= cz) { oct |= 4; oz += len; }
+
+            key = (key << 3) | (unsigned long long)oct;
+        }
+
+        particles[i].key = (long long)key;
+    }
+}
+

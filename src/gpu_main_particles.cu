@@ -122,19 +122,21 @@ int main(int argc, char **argv){
     
     switch(dist_type){
         case DIST_BOX:
-            box_distribution_kernel<<<grid, block, 0, s>>>(rank_array, length_per_rank, box_length, seed);
-            break;
+        box_distribution_kernel<<<grid, block, 0, s>>>(rank_array, length_per_rank, box_length, seed);
+        break;
         case DIST_TORUS:
-            torus_distribution_kernel<<<grid, block, 0, s>>>(rank_array, length_per_rank, major_r, minor_r, box_length, seed);
-            break;
+        torus_distribution_kernel<<<grid, block, 0, s>>>(rank_array, length_per_rank, major_r, minor_r, box_length, seed);
+        break;
     }
+    
+    // cria as keys na gpu.
+    //generate_particles_keys(rank_array, length_per_rank, box_length);
+    generate_keys_kernel<<<grid, block, 0, s>>>(rank_array, length_per_rank, box_length);
     
     cudaDeviceSynchronize();
     cudaMemcpy(host_array, rank_array, length_per_rank * sizeof(t_particle), cudaMemcpyDeviceToHost);
     print_particles(host_array, length_per_rank, rank);
-
-    // cria as keys na gpu.
-    //generate_particles_keys(rank_array, length_per_rank, box_length);
+    
     
     // distribui as keys na gpu.
     //distribute_particles(&rank_array, &length_per_rank, nprocs);
@@ -147,7 +149,8 @@ int main(int argc, char **argv){
     
     if(rank == 0)
         log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, end_time - start_time);    
-
+    
+    cudaFreeHost(host_array);
     cudaFree(rank_array);
     return 0;
 }

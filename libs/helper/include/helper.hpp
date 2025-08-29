@@ -50,4 +50,5 @@ void print_particles(t_particle *particle_array, int size, int rank);
 // GPU Kernels
 __global__ void box_distribution_kernel(t_particle* particles,int N, double L, unsigned long long seed);
 __global__ void torus_distribution_kernel(t_particle* particles, int N, double major_r, double minor_r, double box_length, unsigned long long seed);
+__global__ void generate_keys_kernel(t_particle* particles, int N, double box_length);
 #endif
