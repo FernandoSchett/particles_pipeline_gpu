@@ -25,3 +25,9 @@
 1. Run:
 
          sh scripts/run_jobs.sh 
+
+## Dependencies:
+
+    - MPI
+    - CMake
+    - Boost
