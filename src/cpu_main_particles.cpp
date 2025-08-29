@@ -44,16 +44,16 @@ void log_results(int rank, int power, long long total_particles, int length_per_
     struct stat buffer;
     int file_exists = (stat("../results.csv", &buffer) == 0);
 
-    FILE *f = fopen("../results.csv", "a");
+    FILE *f = fopen("../../results.csv", "a");
 
     if (!file_exists) {
-        fprintf(f, "datetime,power,total_particles,length_per_rank,num_procs,box_length,RAM_GB,execution_time\n");
+        fprintf(f, "datetime,power,total_particles,length_per_rank,num_procs,box_length,RAM_GB,execution_time,device\n");
     }
 
-    fprintf(f, "%s,%d,%lld,%d,%d,%.1f,%.2f,%f\n", 
+    fprintf(f, "%s,%d,%lld,%d,%d,%.1f,%.2f,%f,cpu\n", 
             time_str, power, total_particles, length_per_rank, nprocs,
             box_length, RAM_GB, execution_time);
-    printf("%s,%d,%lld,%d,%d,%.1f,%.2f,%f\n", 
+    printf("%s,%d,%lld,%d,%d,%.1f,%.2f,%f,cpu\n", 
             time_str, power, total_particles, length_per_rank, nprocs,
             box_length, RAM_GB, execution_time);
 

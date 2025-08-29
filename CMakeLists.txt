@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF) # No compiler extensions
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-project(P_SFC VERSION 0.0.1 LANGUAGES CXX)
+project(P_SFC VERSION 0.0.1 LANGUAGES CXX CUDA)
 
 # Dependencies
 find_package(MPI REQUIRED COMPONENTS CXX)
@@ -14,3 +14,6 @@ find_package(Boost REQUIRED)
 add_subdirectory(third_party)
 add_subdirectory(libs)
 add_subdirectory(src)
+
+# TO DO:
+# Make role project download especifc versions of Boost and random, not as submodules. compile boost with the hole project. 

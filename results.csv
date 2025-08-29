@@ -1,0 +1,2 @@
+datetime,power,total_particles,length_per_rank,num_procs,box_length,RAM_GB,execution_time
+2025-08-29 11:17:13,3,2500,625,4,1000.0,0.00,0.003962
