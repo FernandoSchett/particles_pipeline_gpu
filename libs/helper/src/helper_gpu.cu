@@ -6,9 +6,7 @@ __global__ void box_distribution_kernel(t_particle* particles, int N, double L, 
     using RNG = r123::Philox4x32;
     RNG::key_type key = {{ (uint32_t)seed, (uint32_t)(seed >> 32) }};
 
-    for (int i = blockIdx.x * blockDim.x + threadIdx.x;
-         i < N;
-         i += blockDim.x * gridDim.x)
+    for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < N; i += blockDim.x * gridDim.x)
     {
         RNG::ctr_type ctr = {{ (uint32_t)i, 0u, 0u, 0u }};
         RNG::ctr_type r   = RNG()(ctr, key);
@@ -26,9 +24,7 @@ __global__ void torus_distribution_kernel(t_particle* particles, int N, double m
     const double TWO_PI = 6.283185307179586476925286766559;
     const double center = box_length * 0.5;
 
-    for (int i = blockIdx.x * blockDim.x + threadIdx.x;
-         i < N;
-         i += blockDim.x * gridDim.x)
+    for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < N; i += blockDim.x * gridDim.x)
     {
         RNG::ctr_type ctr = {{ (uint32_t)i, 0u, 0u, 0u }};
         RNG::ctr_type rnum = RNG()(ctr, key);
@@ -56,9 +52,7 @@ __global__ void torus_distribution_kernel(t_particle* particles, int N, double m
 
 __global__ void generate_keys_kernel(t_particle* particles, int N, double box_length)
 {
-    for (int i = blockIdx.x * blockDim.x + threadIdx.x;
-         i < N;
-         i += blockDim.x * gridDim.x)
+    for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < N; i += blockDim.x * gridDim.x)
     {
         double x = particles[i].coord[0];
         double y = particles[i].coord[1];
@@ -89,3 +83,33 @@ __global__ void generate_keys_kernel(t_particle* particles, int N, double box_le
     }
 }
 
+__global__ void set_rank_kernel(t_particle* p, int n, int rank_id){
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) p[i].mpi_rank = rank_id;
+}
+
+static void gpu_barrier(int nprocs, const std::vector<cudaStream_t>& streams){
+    for(int d = 0; d < nprocs; ++d){  
+        cudaSetDevice(d); 
+        cudaStreamSynchronize(streams[d]); 
+    }
+}
+
+static void enable_p2p_all(int ndev){
+    for (int i = 0;i < ndev; ++i){
+        cudaSetDevice(i);   
+        for (int j = 0; j < ndev; ++j){
+            if (i == j) continue;
+            
+            int can = 0; 
+            cudaDeviceCanAccessPeer(&can, i, j);
+            
+            if (can){
+                auto err = cudaDeviceEnablePeerAccess(j,0);
+                if (err!=cudaSuccess && err!=cudaErrorPeerAccessAlreadyEnabled){
+                    cudaGetLastError(); 
+                }
+            }
+        }
+    }
+}

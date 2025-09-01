@@ -1,6 +1,5 @@
 #include "./helper.hpp"
 
-
 MPI_Datatype MPI_particle;
 int register_MPI_Particle(MPI_Datatype *MPI_Particle){
     int blocklengths[NPROPS_PARTICLE] = {1, 1, 3}; 

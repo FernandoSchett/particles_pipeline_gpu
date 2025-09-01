@@ -14,13 +14,29 @@
 #include <Random123/philox.h>
 #include <Random123/uniform.hpp>
 #include <boost/sort/spreadsort/integer_sort.hpp>
-//#include <boost/sort/spreadsort/spreadsort.hpp>
+
+
+#include <thrust/device_ptr.h>
+#include <thrust/sort.h>
+#include <thrust/binary_search.h>
+#include <thrust/system/cuda/execution_policy.h>
+#include <algorithm>
+#include <vector>
+#include <numeric>
+#include <cassert>
 
 typedef struct particle{
     int mpi_rank;
     long long int key;
     double coord[3];
 } t_particle;
+
+struct key_less {
+    __host__ __device__
+    bool operator()(const t_particle& a, const t_particle& b) const {
+        return (unsigned long long)a.key < (unsigned long long)b.key;
+    }
+};
 
 typedef enum {DIST_BOX, DIST_TORUS, DIST_UNKNOWN} dist_type_t;
 
@@ -51,4 +67,10 @@ void print_particles(t_particle *particle_array, int size, int rank);
 __global__ void box_distribution_kernel(t_particle* particles,int N, double L, unsigned long long seed);
 __global__ void torus_distribution_kernel(t_particle* particles, int N, double major_r, double minor_r, double box_length, unsigned long long seed);
 __global__ void generate_keys_kernel(t_particle* particles, int N, double box_length);
+__global__ void set_rank_kernel(t_particle* p, int n, int rank_id);
+
+// GPU Utils
+static void gpu_barrier(int nprocs, const std::vector<cudaStream_t>& streams);
+static void enable_p2p_all(int ndev);
+
 #endif
