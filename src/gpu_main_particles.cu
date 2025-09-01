@@ -100,12 +100,17 @@ int main(int argc, char** argv)
 {
     int rank = 0;
     int nprocs = 1;
-
+    cudaGetDeviceCount(&nprocs);
+    std::cout << "Using " << nprocs << " GPUs\n";
+    
     int length_per_rank = 0;
     long long total_particles = 0;
 
     t_particle* rank_array = nullptr;
     t_particle* host_array = nullptr;
+
+    cudaEvent_t kStart, kStop;
+    std::vector<cudaStream_t> gpu_streams(nprocs);
 
     dist_type_t dist_type;
     int power = DEFAULT_POWER;
@@ -117,51 +122,67 @@ int main(int argc, char** argv)
     float gen_ms = 0.0f;
     double kernel_time_sec = 0.0;
 
-    parse_args(argc, argv, &power, &dist_type);
-    setup_particles_box_length(power, nprocs, rank, &length_per_rank, &box_length, &total_particles, &RAM_GB, &major_r, &minor_r);
-
-    // aloca particulas na gpu.
-    cudaMalloc(&rank_array, static_cast<size_t>(length_per_rank) * sizeof(t_particle));
-    cudaMallocHost(&host_array, static_cast<size_t>(length_per_rank) * sizeof(t_particle));
-
-    const unsigned long long seed =
-        static_cast<unsigned long long>(std::time(nullptr)) ^ (0x9E3779B97F4A7C15ull * static_cast<unsigned long long>(rank + 1));
-
-    cudaStream_t queue = 0;
+    int seed = 0;
+    
     const int block = 256;
     int sms = 0;
-    cudaDeviceGetAttribute(&sms, cudaDevAttrMultiProcessorCount, 0);
     int maxBlocks = sms * 20;
     int grid = (length_per_rank + block - 1) / block;
-    if (grid > maxBlocks) grid = maxBlocks;
 
-    switch (dist_type) {
-        case DIST_BOX:
-            box_distribution_kernel<<<grid, block, 0, queue>>>(rank_array, length_per_rank, box_length, seed);
-            break;
-        case DIST_TORUS:
-            torus_distribution_kernel<<<grid, block, 0, queue>>>(rank_array, length_per_rank, major_r, minor_r, box_length, seed);
-            break;
-        default:
-            break;
+    parse_args(argc, argv, &power, &dist_type);
+    
+    std::vector<t_particle*> d_rank_array(nprocs, nullptr);
+    std::vector<t_particle*> h_host_array(nprocs, nullptr);
+    std::vector<cudaEvent_t> kStart_v(nprocs), kStop_v(nprocs);
+
+    for(int dev = 0; dev < nprocs; dev++){
+        cudaSetDevice(dev);
+        cudaStreamCreate(&gpu_streams[dev]);
+
+        // aloca particulas na gpu.
+        setup_particles_box_length(power, nprocs, dev, &length_per_rank, &box_length, &total_particles, &RAM_GB, &major_r, &minor_r);
+        cudaMalloc(&d_rank_array[dev], static_cast<size_t>(length_per_rank) * sizeof(t_particle));
+        cudaMallocHost(&h_host_array[dev], static_cast<size_t>(length_per_rank) * sizeof(t_particle));
+
+        //set gpu kernel configs
+        cudaDeviceGetAttribute(&sms, cudaDevAttrMultiProcessorCount, dev);
+        maxBlocks = sms * 20;
+        grid = (length_per_rank + block - 1) / block;        
+        seed = dev;
+        if (grid > maxBlocks) grid = maxBlocks;
+
+        switch (dist_type) {
+            case DIST_BOX:
+                box_distribution_kernel<<<grid, block, 0, gpu_streams[dev]>>>(d_rank_array[dev], length_per_rank, box_length, seed);
+                break;
+            case DIST_TORUS:
+                torus_distribution_kernel<<<grid, block, 0, gpu_streams[dev]>>>(d_rank_array[dev], length_per_rank, major_r, minor_r, box_length, seed);
+                break;
+            default:
+                break;
+        }
+
+        // cria as keys na gpu.
+        //generate_particles_keys(rank_array, length_per_rank, box_length);
+        cudaEventCreate(&kStart_v[dev]);
+        cudaEventCreate(&kStop_v[dev]);
+        cudaEventRecord(kStart_v[dev], gpu_streams[dev]);
+
+        generate_keys_kernel<<<grid, block, 0, gpu_streams[dev]>>>(d_rank_array[dev], length_per_rank, box_length);
+        
+        cudaEventRecord(kStop_v[dev], gpu_streams[dev]);
+
+        cudaMemcpyAsync(h_host_array[dev], d_rank_array[dev], static_cast<size_t>(length_per_rank) * sizeof(t_particle), cudaMemcpyDeviceToHost, gpu_streams[dev]);
     }
 
-    // cria as keys na gpu.
-    //generate_particles_keys(rank_array, length_per_rank, box_length);
-    cudaEvent_t kStart, kStop;
-    cudaEventCreate(&kStart);
-    cudaEventCreate(&kStop);
+    for(int dev = 0; dev < nprocs; dev++){
+        cudaSetDevice(dev);
+        cudaEventSynchronize(kStop_v[dev]);
+        cudaEventElapsedTime(&gen_ms, kStart_v[dev], kStop_v[dev]);
+        kernel_time_sec = std::max(kernel_time_sec, static_cast<double>(gen_ms) / 1000.0);
+        cudaStreamSynchronize(gpu_streams[dev]);
+    }
 
-    cudaEventRecord(kStart, queue);
-    generate_keys_kernel<<<grid, block, 0, queue>>>(rank_array, length_per_rank, box_length);
-    cudaEventRecord(kStop, queue);
-    cudaEventSynchronize(kStop);
-
-    cudaEventElapsedTime(&gen_ms, kStart, kStop);
-    kernel_time_sec = gen_ms / 1000.0;
-
-    cudaDeviceSynchronize();
-    cudaMemcpy(host_array, rank_array, static_cast<size_t>(length_per_rank) * sizeof(t_particle), cudaMemcpyDeviceToHost);
     //print_particles(host_array, length_per_rank, rank);
 
     // distribui as keys na gpu.
@@ -173,15 +194,16 @@ int main(int argc, char** argv)
     //sprintf(filename, "particle_file_n%d_total%lld", nprocs, total_particles);
     //parallel_write_to_file(rank_array, length_vector, filename);
 
-    if (rank == 0) {
-        log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, kernel_time_sec);
+    log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, kernel_time_sec);
+    
+    for(int dev = 0; dev < nprocs; dev++){
+        cudaSetDevice(dev);
+        cudaEventDestroy(kStart_v[dev]);
+        cudaEventDestroy(kStop_v[dev]);
+        cudaStreamDestroy(gpu_streams[dev]);
+        if (h_host_array[dev]) cudaFreeHost(h_host_array[dev]);
+        if (d_rank_array[dev]) cudaFree(d_rank_array[dev]);
     }
-
-    cudaEventDestroy(kStart);
-    cudaEventDestroy(kStop);
-
-    cudaFreeHost(host_array);
-    cudaFree(rank_array);
 
     return 0;
 }
