@@ -133,10 +133,11 @@ int main(int argc, char** argv)
         cudaSetDevice(dev);
         cudaStreamCreate(&gpu_streams[dev]);
 
-        // aloca particulas na gpu.
         setup_particles_box_length(power, nprocs, dev, &length_per_rank, &box_length, &total_particles, &RAM_GB, &major_r, &minor_r);
-        cudaMalloc(&d_rank_array[dev], static_cast<size_t>(length_per_rank) * sizeof(t_particle));
-        cudaMallocHost(&h_host_array[dev], static_cast<size_t>(length_per_rank) * sizeof(t_particle));
+        
+        // aloca particulas na gpu.
+        cudaMallocAsync(&d_rank_array[dev], length_per_rank * sizeof(t_particle), gpu_streams[dev]);        
+        cudaMallocHost(&h_host_array[dev], length_per_rank * sizeof(t_particle));
 
         //set gpu kernel configs
         cudaDeviceGetAttribute(&sms, cudaDevAttrMultiProcessorCount, dev);
@@ -156,12 +157,11 @@ int main(int argc, char** argv)
                 break;
         }
 
-        // cria as keys na gpu.
-        //generate_particles_keys(rank_array, length_per_rank, box_length);
         cudaEventCreate(&kStart_v[dev]);
         cudaEventCreate(&kStop_v[dev]);
         cudaEventRecord(kStart_v[dev], gpu_streams[dev]);
-
+        
+        // cria as keys na gpu.
         generate_keys_kernel<<<grid, block, 0, gpu_streams[dev]>>>(d_rank_array[dev], length_per_rank, box_length);
         
         cudaEventRecord(kStop_v[dev], gpu_streams[dev]);
@@ -194,9 +194,9 @@ int main(int argc, char** argv)
         cudaSetDevice(dev);
         cudaEventDestroy(kStart_v[dev]);
         cudaEventDestroy(kStop_v[dev]);
-        cudaStreamDestroy(gpu_streams[dev]);
+        if (d_rank_array[dev]) cudaFreeAsync(d_rank_array[dev], gpu_streams[dev]);
         if (h_host_array[dev]) cudaFreeHost(h_host_array[dev]);
-        if (d_rank_array[dev]) cudaFree(d_rank_array[dev]);
+        cudaStreamDestroy(gpu_streams[dev]);
     }
 
     return 0;
