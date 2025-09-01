@@ -106,10 +106,6 @@ int main(int argc, char** argv)
     int length_per_rank = 0;
     long long total_particles = 0;
 
-    t_particle* rank_array = nullptr;
-    t_particle* host_array = nullptr;
-
-    cudaEvent_t kStart, kStop;
     std::vector<cudaStream_t> gpu_streams(nprocs);
 
     dist_type_t dist_type;
@@ -126,8 +122,6 @@ int main(int argc, char** argv)
     
     const int block = 256;
     int sms = 0;
-    int maxBlocks = sms * 20;
-    int grid = (length_per_rank + block - 1) / block;
 
     parse_args(argc, argv, &power, &dist_type);
     
@@ -146,8 +140,8 @@ int main(int argc, char** argv)
 
         //set gpu kernel configs
         cudaDeviceGetAttribute(&sms, cudaDevAttrMultiProcessorCount, dev);
-        maxBlocks = sms * 20;
-        grid = (length_per_rank + block - 1) / block;        
+        int maxBlocks = sms * 20;
+        int grid = (length_per_rank + block - 1) / block;        
         seed = dev;
         if (grid > maxBlocks) grid = maxBlocks;
 
@@ -183,8 +177,6 @@ int main(int argc, char** argv)
         cudaStreamSynchronize(gpu_streams[dev]);
     }
 
-    //print_particles(host_array, length_per_rank, rank);
-
     // distribui as keys na gpu.
     //distribute_particles(&rank_array, &length_per_rank, nprocs);
 
@@ -196,6 +188,8 @@ int main(int argc, char** argv)
 
     log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, kernel_time_sec);
     
+    
+    // Cleans everything 
     for(int dev = 0; dev < nprocs; dev++){
         cudaSetDevice(dev);
         cudaEventDestroy(kStart_v[dev]);
