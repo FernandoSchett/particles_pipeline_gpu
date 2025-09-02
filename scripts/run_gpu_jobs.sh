@@ -1,0 +1,29 @@
+
+#!/bin/bash -l
+
+GPU_PER_NODE=4 
+PARTITION=booster
+TIMES=1
+
+pwd
+
+for pp in 3
+do
+    for ngpu in 1 
+    do
+        NODES=$(( (ngpu + GPU_PER_NODE - 1) / GPU_PER_NODE ))
+        echo "Submitting job: np=$gpu, nodes=$NODES, partition=$PARTITION"
+        
+        sbatch \
+            --nodes=$NODES \
+            --ntasks=$ngpu \
+            --cpus-per-task=1 \
+            --time=00:10:00 \
+            --partition=$PARTITION \
+            --account=gsp25 \
+            --job-name=exp_np${gpu} \
+            --output=exp_gpu${gpu}_%j.out \
+            --error=exp_gpu${gpu}_%j.err \
+            ./run_gpu_experiments.sh torus $pp $TIMES
+    done
+done

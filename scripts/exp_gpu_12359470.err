@@ -1,0 +1,6 @@
+Lmod has detected the following error: These module(s) or extension(s) exist but cannot be loaded as requested: "Boost/1.86.0"
+   Try: "module spider Boost/1.86.0" to see how to load the module(s).
+
+
+
+srun: error: Invalid numeric value "../build/src/gpu_p_sfc_exe" for --ntasks.

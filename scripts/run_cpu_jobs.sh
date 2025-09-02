@@ -2,16 +2,7 @@
 
 CORES_PER_NODE=128 
 PARTITION=dc-cpu
-
-cd "$(dirname "$0")/.."
-
-rm -rf build
-rm -f results.csv
-mkdir build
-cd build
-
-cmake ..
-cmake --build .
+TIMES=5
 
 for pp in 8 
 done
@@ -30,6 +21,6 @@ done
             --job-name=exp_np${np} \
             --output=exp_np${np}_%j.out \
             --error=exp_np${np}_%j.err \
-            ../scripts/run_experiment.sh $np torus $pp
+            ./run_cpu_experiment.sh $np torus $pp $TIMES
     done
 done
