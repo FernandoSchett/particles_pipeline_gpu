@@ -2,3 +2,5 @@ build/
 .vscode/
 *.png
 .ipynb_checkpoints
+scripts/*.out
+scripts/*.err
