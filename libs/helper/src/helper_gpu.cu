@@ -88,14 +88,14 @@ __global__ void set_rank_kernel(t_particle* p, int n, int rank_id){
   if (i < n) p[i].mpi_rank = rank_id;
 }
 
-static void gpu_barrier(int nprocs, const std::vector<cudaStream_t>& streams){
+void gpu_barrier(int nprocs, const std::vector<cudaStream_t>& streams){
     for(int d = 0; d < nprocs; ++d){  
         cudaSetDevice(d); 
         cudaStreamSynchronize(streams[d]); 
     }
 }
 
-static void enable_p2p_all(int ndev){
+void enable_p2p_all(int ndev){
     for (int i = 0;i < ndev; ++i){
         cudaSetDevice(i);   
         for (int j = 0; j < ndev; ++j){

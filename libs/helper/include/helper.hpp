@@ -70,7 +70,7 @@ __global__ void generate_keys_kernel(t_particle* particles, int N, double box_le
 __global__ void set_rank_kernel(t_particle* p, int n, int rank_id);
 
 // GPU Utils
-static void gpu_barrier(int nprocs, const std::vector<cudaStream_t>& streams);
-static void enable_p2p_all(int ndev);
+void gpu_barrier(int nprocs, const std::vector<cudaStream_t>& streams);
+void enable_p2p_all(int ndev);
 
 #endif

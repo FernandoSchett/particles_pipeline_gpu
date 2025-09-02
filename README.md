@@ -24,10 +24,11 @@
 
 1. Run:
 
-         sh scripts/run_jobs.sh 
+         sh scripts/run_all_jobs.sh 
 
 ## Dependencies:
 
     - MPI
     - CMake
     - Boost
+    - CUDA
