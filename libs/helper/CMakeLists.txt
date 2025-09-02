@@ -19,7 +19,6 @@ set_target_properties(helper PROPERTIES
   CUDA_SEPARABLE_COMPILATION ON
   CUDA_STANDARD 17
   POSITION_INDEPENDENT_CODE ON
-  CUDA_ARCHITECTURES 86
 )
 
 target_compile_features(helper PUBLIC cxx_std_20)
