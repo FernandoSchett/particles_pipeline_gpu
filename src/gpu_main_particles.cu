@@ -261,6 +261,49 @@ void parse_args(int argc, char** argv, int* power, dist_type_t* dist_type)
     }
 }
 
+#include <cstdint>
+#include <fstream>
+
+int singleproc_write_to_file(t_particle **arrays, const int *counts, int nprocs, const char *filename)
+{
+    // abre em binário, sobrescrevendo se existir
+    FILE *fp = std::fopen(filename, "wb");
+    if (!fp) {
+        std::perror("singleproc_write_to_file: fopen");
+        return 1;
+    }
+
+    // cabeçalho: total number of particles (8 bytes), como no seu rank_offset=8
+    long long int tnp = 0;
+    for (int d = 0; d < nprocs; ++d) {
+        if (counts[d] < 0) { std::fclose(fp); return 2; }
+        tnp += static_cast<long long int>(counts[d]);
+    }
+
+    if (std::fwrite(&tnp, sizeof(long long int), 1, fp) != 1) {
+        std::perror("singleproc_write_to_file: fwrite(tnp)");
+        std::fclose(fp);
+        return 3;
+    }
+
+    // payload: blocos por GPU em ordem, exatamente como “cada rank escreve seu trecho”
+    for (int d = 0; d < nprocs; ++d) {
+        const size_t bytes = static_cast<size_t>(counts[d]) * sizeof(t_particle);
+        if (bytes == 0) continue;
+        if (!arrays[d]) { std::fclose(fp); return 4; }
+
+        const size_t wrote = std::fwrite(arrays[d], 1, bytes, fp);
+        if (wrote != bytes) {
+            std::perror("singleproc_write_to_file: fwrite(block)");
+            std::fclose(fp);
+            return 5;
+        }
+    }
+
+    std::fclose(fp);
+    return 0;
+}
+
 int main(int argc, char** argv)
 {
     int rank = 0;
@@ -376,6 +419,15 @@ int main(int argc, char** argv)
         kernel_time_sec = std::max(kernel_time_sec, static_cast<double>(gen_ms) / 1000.0);
         cudaStreamSynchronize(gpu_streams[dev]);
     }
+
+    gpu_barrier(nprocs, gpu_streams);
+
+    // grava no arquivo "particles_file" com o mesmo layout (tnp + blocos)
+    int rc = singleproc_write_to_file(h_host_array.data(), lens.data(), nprocs, "particles_file");
+    if (rc != 0) {
+        std::cerr << "Falha ao escrever particles_file, rc=" << rc << "\n";
+    }
+
 
     // distribui as keys na gpu.
     //distribute_particles(&rank_array, &length_per_rank, nprocs);
