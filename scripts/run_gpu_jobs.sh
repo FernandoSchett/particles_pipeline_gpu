@@ -6,21 +6,22 @@ TIMES=1
 
 for pp in 3
 do
-    for ngpu in 1 
+    for ngpu in 1 2
     do
         NODES=$(( (ngpu + GPU_PER_NODE - 1) / GPU_PER_NODE ))
-        echo "Submitting job: np=$gpu, nodes=$NODES, partition=$PARTITION"
+        echo "Submitting job: np=$ngpu, nodes=$NODES, partition=$PARTITION"
         
         xenv sbatch \
             --nodes=$NODES \
-            --ntasks=$ngpu \
+            --ntasks=1 \
             --cpus-per-task=1 \
+            --gpus-per-task=$ngpu \
             --time=00:10:00 \
             --partition=$PARTITION \
             --account=gsp25 \
-            --job-name=exp_np${gpu} \
-            --output=exp_gpu${gpu}_%j.out \
-            --error=exp_gpu${gpu}_%j.err \
+            --job-name=exp_gpu${ngpu} \
+            --output=exp_gpu${ngpu}_%j.out \
+            --error=exp_gpu${ngpu}_%j.err \
             ./run_gpu_experiment.sh torus $pp $TIMES
     done
 done

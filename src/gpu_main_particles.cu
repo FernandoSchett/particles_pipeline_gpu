@@ -299,7 +299,7 @@ int main(int argc, char** argv)
         cudaStreamCreate(&gpu_streams[dev]);
 
         setup_particles_box_length(power, nprocs, dev, &length_per_rank, &box_length, &total_particles, &RAM_GB, &major_r, &minor_r);
-        lens[dev] = total_particles;
+        lens[dev] = length_per_rank;
 
         // aloca particulas na gpu.
         cudaMallocAsync(&d_rank_array[dev], length_per_rank * sizeof(t_particle), gpu_streams[dev]);        
@@ -335,11 +335,41 @@ int main(int argc, char** argv)
     }
     //Barrier
     gpu_barrier(nprocs, gpu_streams);
-    distribute_gpu_particles(d_rank_array, lens, gpu_streams);  // faz o sort+all-to-all intra-nó    
+    distribute_gpu_particles(d_rank_array, lens, gpu_streams);  // atualiza d_rank_array[] e lens[]
+    
+    // *** (Re)alocar host e copiar de volta para host para poder imprimir ***
+    for (int dev = 0; dev < nprocs; ++dev) {
+        cudaSetDevice(dev);
+    
+        // se já existia, descarta o buffer antigo para evitar overflow
+        if (h_host_array[dev]) {
+            cudaFreeHost(h_host_array[dev]);
+            h_host_array[dev] = nullptr;
+        }
+    
+        const size_t bytes = static_cast<size_t>(lens[dev]) * sizeof(t_particle);
+        if (lens[dev] > 0) {
+            // aloca host pinned com o tamanho *novo* pós-redistribuição
+            cudaMallocHost(&h_host_array[dev], bytes);
+            // copia D -> H no stream da GPU destino
+            cudaMemcpyAsync(h_host_array[dev], d_rank_array[dev], bytes,
+                            cudaMemcpyDeviceToHost, gpu_streams[dev]);
+        }
+    }
+    
+    // garante que todas as cópias D->H terminaram
+    gpu_barrier(nprocs, gpu_streams);
+    
+    // agora sim: imprime do host
+    for (int dev = 0; dev < nprocs; ++dev) {
+        if (lens[dev] == 0) continue;
+        print_particles(h_host_array[dev], lens[dev], dev);
+    }
+
     
     for(int dev = 0; dev < nprocs; dev++){
         cudaSetDevice(dev);
-        //print_particles(h_host_array[dev], lens[dev], dev);        
+        print_particles(h_host_array[dev], lens[dev], dev);        
 
         cudaEventSynchronize(kStop_v[dev]);
         cudaEventElapsedTime(&gen_ms, kStart_v[dev], kStop_v[dev]);
