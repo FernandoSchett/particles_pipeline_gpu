@@ -9,12 +9,11 @@
 #include <stdlib.h>
 #include <math.h>
 #include <mpi.h>
-#include <cuda_runtime.h> 
+#include <cuda_runtime.h>
 
 #include <Random123/philox.h>
 #include <Random123/uniform.hpp>
 #include <boost/sort/spreadsort/integer_sort.hpp>
-
 
 #include <thrust/device_ptr.h>
 #include <thrust/sort.h>
@@ -25,20 +24,27 @@
 #include <numeric>
 #include <cassert>
 
-typedef struct particle{
+typedef struct particle
+{
     int mpi_rank;
     long long int key;
     double coord[3];
 } t_particle;
 
-struct key_less {
-    __host__ __device__
-    bool operator()(const t_particle& a, const t_particle& b) const {
+struct key_less
+{
+    __host__ __device__ bool operator()(const t_particle &a, const t_particle &b) const
+    {
         return (unsigned long long)a.key < (unsigned long long)b.key;
     }
 };
 
-typedef enum {DIST_BOX, DIST_TORUS, DIST_UNKNOWN} dist_type_t;
+typedef enum
+{
+    DIST_BOX,
+    DIST_TORUS,
+    DIST_UNKNOWN
+} dist_type_t;
 
 #define NPROPS_PARTICLE 3
 #define MAX_DEPTH 15
@@ -63,14 +69,20 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
 
 void print_particles(t_particle *particle_array, int size, int rank);
 
+void setup_particles_box_length(int power, int nprocs, int rank, int *length_per_rank, double *box_length, long long *total_particles, double *RAM_GB, int *major_r, int *minor_r);
+
 // GPU Kernels
-__global__ void box_distribution_kernel(t_particle* particles,int N, double L, unsigned long long seed);
-__global__ void torus_distribution_kernel(t_particle* particles, int N, double major_r, double minor_r, double box_length, unsigned long long seed);
-__global__ void generate_keys_kernel(t_particle* particles, int N, double box_length);
-__global__ void set_rank_kernel(t_particle* p, int n, int rank_id);
+__global__ void box_distribution_kernel(t_particle *particles, int N, double L, unsigned long long seed);
+__global__ void torus_distribution_kernel(t_particle *particles, int N, double major_r, double minor_r, double box_length, unsigned long long seed);
+__global__ void generate_keys_kernel(t_particle *particles, int N, double box_length);
+__global__ void set_rank_kernel(t_particle *p, int n, int rank_id);
 
 // GPU Utils
-void gpu_barrier(int nprocs, const std::vector<cudaStream_t>& streams);
+void gpu_barrier(int nprocs, const std::vector<cudaStream_t> &streams);
 void enable_p2p_all(int ndev);
+int concat_and_serial_write(t_particle **arrays, const int *counts, int nprocs, const char *filename);
+int distribute_gpu_particles(std::vector<t_particle *> &d_rank_array, std::vector<int> &lens, std::vector<cudaStream_t> &gpu_streams);
+void compute_cuts_for_dev(int dev, t_particle *d_ptr, int n, const std::vector<unsigned long long> &splitters, std::vector<int> &cuts_out, cudaStream_t stream);
+long long count_leq_device(int dev, t_particle *d_ptr, int n, unsigned long long mid, cudaStream_t stream);
 
 #endif
