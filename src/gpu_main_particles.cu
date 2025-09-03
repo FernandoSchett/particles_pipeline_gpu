@@ -264,45 +264,97 @@ void parse_args(int argc, char** argv, int* power, dist_type_t* dist_type)
 #include <cstdint>
 #include <fstream>
 
-int singleproc_write_to_file(t_particle **arrays, const int *counts, int nprocs, const char *filename)
+// Grava no formato portável (36 bytes/part), igual ao serial_write_to_file,
+// mas aceitando N buffers (um por GPU) e escrevendo um ÚNICO arquivo:
+// [ int64 total_particles ] + N blocos de partículas, cada registro:
+//   int32 mpi_rank; int64 key; float64 x; float64 y; float64 z
+int singleproc_write_to_file_portable_concat(t_particle **arrays,
+                                             const int *counts,
+                                             int nprocs,
+                                             const char *filename)
 {
-    // abre em binário, sobrescrevendo se existir
     FILE *fp = std::fopen(filename, "wb");
-    if (!fp) {
-        std::perror("singleproc_write_to_file: fopen");
-        return 1;
-    }
+    if (!fp) { std::perror("open particles_file"); return 1; }
 
-    // cabeçalho: total number of particles (8 bytes), como no seu rank_offset=8
+    // Header: total de partículas (int64)
     long long int tnp = 0;
     for (int d = 0; d < nprocs; ++d) {
         if (counts[d] < 0) { std::fclose(fp); return 2; }
-        tnp += static_cast<long long int>(counts[d]);
+        tnp += (long long)counts[d];
+    }
+    if (std::fwrite(&tnp, sizeof(long long), 1, fp) != 1) {
+        std::perror("write tnp"); std::fclose(fp); return 3;
     }
 
-    if (std::fwrite(&tnp, sizeof(long long int), 1, fp) != 1) {
-        std::perror("singleproc_write_to_file: fwrite(tnp)");
-        std::fclose(fp);
-        return 3;
-    }
-
-    // payload: blocos por GPU em ordem, exatamente como “cada rank escreve seu trecho”
+    // Registros: exatamente como serial_write_to_file (36 bytes por partícula)
     for (int d = 0; d < nprocs; ++d) {
-        const size_t bytes = static_cast<size_t>(counts[d]) * sizeof(t_particle);
-        if (bytes == 0) continue;
-        if (!arrays[d]) { std::fclose(fp); return 4; }
+        const int n = counts[d];
+        const t_particle *p = arrays[d];
+        if (n == 0) continue;
+        if (!p) { std::fclose(fp); return 4; }
 
-        const size_t wrote = std::fwrite(arrays[d], 1, bytes, fp);
-        if (wrote != bytes) {
-            std::perror("singleproc_write_to_file: fwrite(block)");
-            std::fclose(fp);
-            return 5;
+        for (int i = 0; i < n; ++i) {
+            // tamanhos fixos e ordem fixa
+            int32_t  mpi_rank = (int32_t)p[i].mpi_rank;       // 4
+            int64_t  key      = (int64_t)p[i].key;            // 8
+            double   x        = p[i].coord[0];                // 8
+            double   y        = p[i].coord[1];                // 8
+            double   z        = p[i].coord[2];                // 8
+
+            if (std::fwrite(&mpi_rank, sizeof(int32_t), 1, fp) != 1 ||
+                std::fwrite(&key,      sizeof(int64_t), 1, fp) != 1 ||
+                std::fwrite(&x,        sizeof(double),  1, fp) != 1 ||
+                std::fwrite(&y,        sizeof(double),  1, fp) != 1 ||
+                std::fwrite(&z,        sizeof(double),  1, fp) != 1) {
+                std::perror("write particle");
+                std::fclose(fp);
+                return 5;
+            }
         }
     }
 
     std::fclose(fp);
     return 0;
 }
+
+int concat_and_serial_write(t_particle **arrays,
+                            const int *counts,
+                            int nprocs,
+                            const char *filename)
+{
+    // 1) Soma total
+    long long total_ll = 0;
+    for (int d = 0; d < nprocs; ++d) {
+        if (counts[d] < 0) return 1;
+        total_ll += (long long)counts[d];
+    }
+
+    // serial_write_to_file espera 'int count'; cheque overflow (opcional)
+    if (total_ll > std::numeric_limits<int>::max()) {
+        std::fprintf(stderr, "[E] total particles > INT_MAX (%lld)\n", total_ll);
+        return 2;
+    }
+    const int total = (int)total_ll;
+
+    // 2) Concatena
+    std::vector<t_particle> tmp;
+    tmp.reserve((size_t)total);
+
+    for (int d = 0; d < nprocs; ++d) {
+        const int n = counts[d];
+        if (n <= 0) continue;
+        if (!arrays[d]) return 3;
+
+        // copia exatamente sizeof(t_particle) p/ memória temporária
+        // (isso é só memória; a escrita usará campo-a-campo pela serial_write_to_file)
+        tmp.insert(tmp.end(), arrays[d], arrays[d] + n);
+    }
+
+    // 3) Chama sua função já validada (mesmo layout de 36 bytes)
+    // ATENÇÃO: a assinatura pede char* (não const char*), então fazemos um cast.
+    return serial_write_to_file(tmp.data(), total, const_cast<char*>(filename));
+}
+
 
 int main(int argc, char** argv)
 {
@@ -422,11 +474,15 @@ int main(int argc, char** argv)
 
     gpu_barrier(nprocs, gpu_streams);
 
-    // grava no arquivo "particles_file" com o mesmo layout (tnp + blocos)
-    int rc = singleproc_write_to_file(h_host_array.data(), lens.data(), nprocs, "particles_file");
+
+    int rc = concat_and_serial_write(h_host_array.data(),
+                                    lens.data(),
+                                    nprocs,
+                                    "particle_file");
     if (rc != 0) {
-        std::cerr << "Falha ao escrever particles_file, rc=" << rc << "\n";
+        std::cerr << "Falha ao escrever particles_file via serial_write_to_file, rc=" << rc << "\n";
     }
+
 
 
     // distribui as keys na gpu.

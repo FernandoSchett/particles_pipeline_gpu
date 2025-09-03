@@ -28,7 +28,7 @@ def read_binary(filename):
 files = os.listdir("./build")
 par_file = ""
 for f in files:
-    if f.startswith("particle_file"):
+    if f.startswith("particles_file"):
         par_file = os.path.join("./build", f)
         break
 
