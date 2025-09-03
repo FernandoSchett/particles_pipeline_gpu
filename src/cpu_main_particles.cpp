@@ -13,27 +13,6 @@
 
 #define DEFAULT_POWER 3
 
-void setup_particles_box_length(int power, int nprocs, int rank, int *length_per_rank, double *box_length, long long *total_particles, double *RAM_GB, int *major_r, int *minor_r)
-{
-    const long long slice = static_cast<long long>(std::pow(10, power) / nprocs);
-    *total_particles = ((1 + nprocs) * nprocs / 2) * slice;
-    *RAM_GB = (*total_particles * 40.0) / 1e9; // sizeof(t_particle) is 36, but it can be considered as 40.
-    *box_length = std::pow(10, power);
-    *length_per_rank = (rank + 1) * slice;
-    *major_r = 4 * std::pow(10, power - 1);
-    *minor_r = 2 * std::pow(10, power - 1);
-
-    if (rank == nprocs - 1)
-    {
-        *length_per_rank += *total_particles % nprocs;
-    }
-
-    if (rank == 0)
-    {
-        std::printf("%lld particles distributed like (rank_number*%lld) between %d processes in a %.1f sized box using %.4f GBs.\n",
-                    *total_particles, slice, nprocs, *box_length, *RAM_GB);
-    }
-}
 void log_results(int rank, int power, long long total_particles, int length_per_rank, int nprocs, double box_length, double RAM_GB, double execution_time)
 {
     time_t rawtime;

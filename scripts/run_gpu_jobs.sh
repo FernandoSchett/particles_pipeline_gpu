@@ -22,6 +22,6 @@ do
             --job-name=exp_gpu${ngpu} \
             --output=exp_gpu${ngpu}_%j.out \
             --error=exp_gpu${ngpu}_%j.err \
-            ./run_gpu_experiment.sh torus $pp $TIMES
+            ./run_gpu_experiment.sh box $pp $TIMES
     done
 done
