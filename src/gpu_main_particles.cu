@@ -41,7 +41,7 @@ int main(int argc, char **argv)
 	int nprocs = 1;
 	cudaGetDeviceCount(&nprocs);
 	std::cout << "Using " << nprocs << " GPUs\n";
-    char filename[128];
+	char filename[128];
 
 	int length_per_rank = 0;
 	long long total_particles = 0;
@@ -76,6 +76,7 @@ int main(int argc, char **argv)
 
 		setup_particles_box_length(power, nprocs, dev, &length_per_rank, &box_length, &total_particles, &RAM_GB, &major_r, &minor_r);
 		lens[dev] = length_per_rank;
+		printf("Before distribution %d:  %d\n", dev, lens[dev]);
 
 		// aloca particulas na gpu.
 		cudaMallocAsync(&d_rank_array[dev], length_per_rank * sizeof(t_particle), gpu_streams[dev]);
@@ -96,8 +97,6 @@ int main(int argc, char **argv)
 			break;
 		case DIST_TORUS:
 			torus_distribution_kernel<<<grid, block, 0, gpu_streams[dev]>>>(d_rank_array[dev], length_per_rank, major_r, minor_r, box_length, seed);
-			break;
-		default:
 			break;
 		}
 
@@ -149,11 +148,11 @@ int main(int argc, char **argv)
 	// write results and log it.
 	if (power < 4)
 	{
-        sprintf(filename, "particle_file_gpu_n%d_total%lld", nprocs, total_particles);
-        int rc = concat_and_serial_write(h_host_array.data(), lens.data(), nprocs, filename);
+		sprintf(filename, "particle_file_gpu_n%d_total%lld", nprocs, total_particles);
+		int rc = concat_and_serial_write(h_host_array.data(), lens.data(), nprocs, filename);
 
-		for (int dev = 0; dev < nprocs; dev++)
-			print_particles(h_host_array[dev], lens[dev], dev);
+		// for (int dev = 0; dev < nprocs; dev++)
+		//	print_particles(h_host_array[dev], lens[dev], dev);
 
 		if (rc != 0)
 		{

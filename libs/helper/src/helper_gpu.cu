@@ -374,8 +374,11 @@ int distribute_gpu_particles(std::vector<t_particle *> &d_rank_array, std::vecto
     {
         cudaSetDevice(dev);
         int n = lens[dev];
+        printf("After distribution %d:  %d\n", dev, lens[dev]);
+
         if (n == 0)
             continue;
+
         int grid = (n + block - 1) / block;
         set_rank_kernel<<<grid, block, 0, gpu_streams[dev]>>>(d_rank_array[dev], n, dev);
     }
