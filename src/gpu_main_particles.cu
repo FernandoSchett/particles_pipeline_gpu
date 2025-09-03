@@ -149,7 +149,9 @@ int main(int argc, char **argv)
 	// write results and log it.
 	if (power < 4)
 	{
-		int rc = concat_and_serial_write(h_host_array.data(), lens.data(), nprocs, "particle_file");
+        sprintf(filename, "particle_file_gpu_n%d_total%lld", nprocs, total_particles);
+        int rc = concat_and_serial_write(h_host_array.data(), lens.data(), nprocs, filename);
+
 		for (int dev = 0; dev < nprocs; dev++)
 			print_particles(h_host_array[dev], lens[dev], dev);
 
@@ -159,7 +161,6 @@ int main(int argc, char **argv)
 		}
 	}
 
-    sprintf(filename, "particle_file_gpu_n%d_total%lld", nprocs, total_particles);
 	log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, kernel_time_sec, "gpu");
 
 	// Cleans everything
