@@ -195,15 +195,13 @@ long long count_leq_device(int dev, t_particle *d_ptr, int n, unsigned long long
     auto pol = thrust::cuda::par.on(stream);
     thrust::device_ptr<t_particle> first(d_ptr), last(d_ptr + n);
     auto it = thrust::upper_bound(pol, first, last, probe, key_less{});
-
+    cudaStreamSynchronize(stream);
     return static_cast<long long>(it - first);
 }
 
 int distribute_gpu_particles(std::vector<t_particle *> &d_rank_array, std::vector<int> &lens, std::vector<cudaStream_t> &gpu_streams)
 {
     const int nprocs = (int)d_rank_array.size();
-    assert((int)lens.size() == nprocs && (int)gpu_streams.size() == nprocs);
-
     enable_p2p_all(nprocs);
 
     for (int dev = 0; dev < nprocs; ++dev)
@@ -217,22 +215,10 @@ int distribute_gpu_particles(std::vector<t_particle *> &d_rank_array, std::vecto
         thrust::sort(pol, first, last, key_less{});
     }
 
+    gpu_barrier(nprocs, gpu_streams);
+
     std::vector<unsigned long long> local_min(nprocs, std::numeric_limits<unsigned long long>::max());
     std::vector<unsigned long long> local_max(nprocs, 0ull);
-
-    for (int dev = 0; dev < nprocs; ++dev)
-    {
-        cudaSetDevice(dev);
-        int n = lens[dev];
-        if (n <= 0)
-            continue;
-        t_particle first_h{}, last_h{};
-        cudaMemcpyAsync(&first_h, d_rank_array[dev], sizeof(t_particle),
-                        cudaMemcpyDeviceToHost, gpu_streams[dev]);
-        cudaMemcpyAsync(&last_h, d_rank_array[dev] + (n - 1), sizeof(t_particle),
-                        cudaMemcpyDeviceToHost, gpu_streams[dev]);
-    }
-    gpu_barrier(nprocs, gpu_streams);
     for (int dev = 0; dev < nprocs; ++dev)
     {
         int n = lens[dev];
@@ -261,11 +247,11 @@ int distribute_gpu_particles(std::vector<t_particle *> &d_rank_array, std::vecto
         return 0;
 
     std::vector<unsigned long long> splitters;
-    splitters.reserve(nprocs > 0 ? nprocs - 1 : 0);
+    splitters.reserve(nprocs ? nprocs - 1 : 0);
     unsigned long long lo_base = gmin;
     for (int i = 1; i < nprocs; ++i)
     {
-        const long long target = (N_global * i + nprocs - 1) / nprocs; // ceil div
+        const long long target = (N_global * i + nprocs - 1) / nprocs;
         unsigned long long lo = lo_base, hi = gmax;
         while (lo < hi)
         {
@@ -297,17 +283,16 @@ int distribute_gpu_particles(std::vector<t_particle *> &d_rank_array, std::vecto
         }
         compute_cuts_for_dev(src, d_rank_array[src], lens[src], splitters, cuts[src], gpu_streams[src]);
     }
+
     gpu_barrier(nprocs, gpu_streams);
 
     for (int src = 0; src < nprocs; ++src)
-    {
         for (int b = 0; b < nprocs; ++b)
         {
             int begin = cuts[src][b];
             int end = cuts[src][b + 1];
             sendcounts[src][b] = std::max(0, end - begin);
         }
-    }
 
     std::vector<std::vector<int>> recvcounts(nprocs, std::vector<int>(nprocs, 0));
     for (int dst = 0; dst < nprocs; ++dst)
@@ -341,7 +326,6 @@ int distribute_gpu_particles(std::vector<t_particle *> &d_rank_array, std::vecto
     }
 
     for (int src = 0; src < nprocs; ++src)
-    {
         for (int dst = 0; dst < nprocs; ++dst)
         {
             int cnt = sendcounts[src][dst];
@@ -349,14 +333,11 @@ int distribute_gpu_particles(std::vector<t_particle *> &d_rank_array, std::vecto
                 continue;
             const int begin_src = cuts[src][dst];
             const size_t bytes = (size_t)cnt * sizeof(t_particle);
-
             t_particle *src_ptr = d_rank_array[src] + begin_src;
             t_particle *dst_ptr = d_new[dst] + rdispls[dst][src];
-
             cudaSetDevice(dst);
             cudaMemcpyPeerAsync(dst_ptr, dst, src_ptr, src, bytes, gpu_streams[dst]);
         }
-    }
 
     gpu_barrier(nprocs, gpu_streams);
 
@@ -375,14 +356,12 @@ int distribute_gpu_particles(std::vector<t_particle *> &d_rank_array, std::vecto
         cudaSetDevice(dev);
         int n = lens[dev];
         printf("After distribution %d:  %d\n", dev, lens[dev]);
-
         if (n == 0)
             continue;
-
         int grid = (n + block - 1) / block;
         set_rank_kernel<<<grid, block, 0, gpu_streams[dev]>>>(d_rank_array[dev], n, dev);
     }
-    gpu_barrier(nprocs, gpu_streams);
 
+    gpu_barrier(nprocs, gpu_streams);
     return 0;
 }
