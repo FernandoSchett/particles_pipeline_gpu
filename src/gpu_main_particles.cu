@@ -11,36 +11,6 @@
 
 #define DEFAULT_POWER 3
 
-void log_results(int rank, int power, long long total_particles, int length_per_rank, int nprocs, double box_length, double RAM_GB, double execution_time)
-{
-	time_t rawtime;
-	std::tm *timeinfo;
-	char time_str[64];
-
-	std::time(&rawtime);
-	timeinfo = std::localtime(&rawtime);
-	std::strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", timeinfo);
-
-	struct stat buffer;
-	const char *results_path = "../../results.csv";
-	const int file_exists = (stat(results_path, &buffer) == 0);
-
-	FILE *f = std::fopen(results_path, "a");
-	if (!file_exists)
-	{
-		std::fprintf(f, "datetime,power,total_particles,length_per_rank,num_procs,box_length,RAM_GB,execution_time,device\n");
-	}
-
-	std::fprintf(f, "%s,%d,%lld,%d,%d,%.1f,%.2f,%f,gpu\n",
-				 time_str, power, total_particles, length_per_rank, nprocs,
-				 box_length, RAM_GB, execution_time);
-	std::printf("%s,%d,%lld,%d,%d,%.1f,%.2f,%f,gpu\n",
-				time_str, power, total_particles, length_per_rank, nprocs,
-				box_length, RAM_GB, execution_time);
-
-	std::fclose(f);
-}
-
 void parse_args(int argc, char **argv, int *power, dist_type_t *dist_type)
 {
 	*power = DEFAULT_POWER;
@@ -71,6 +41,7 @@ int main(int argc, char **argv)
 	int nprocs = 1;
 	cudaGetDeviceCount(&nprocs);
 	std::cout << "Using " << nprocs << " GPUs\n";
+    char filename[128];
 
 	int length_per_rank = 0;
 	long long total_particles = 0;
@@ -187,7 +158,9 @@ int main(int argc, char **argv)
 			std::cerr << "Error at writing file, rc=" << rc << "\n";
 		}
 	}
-	log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, kernel_time_sec);
+
+    sprintf(filename, "particle_file_gpu_n%d_total%lld", nprocs, total_particles);
+	log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, kernel_time_sec, "gpu");
 
 	// Cleans everything
 	for (int dev = 0; dev < nprocs; dev++)

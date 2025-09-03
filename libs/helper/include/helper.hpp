@@ -24,6 +24,14 @@
 #include <numeric>
 #include <cassert>
 
+#include <list>
+#include <set>
+#include <cmath>
+#include <cstdlib>
+#include <ctime>
+#include <time.h>
+#include <sys/stat.h>
+
 typedef struct particle
 {
     int mpi_rank;
@@ -70,6 +78,8 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
 void print_particles(t_particle *particle_array, int size, int rank);
 
 void setup_particles_box_length(int power, int nprocs, int rank, int *length_per_rank, double *box_length, long long *total_particles, double *RAM_GB, int *major_r, int *minor_r);
+
+void log_results(int rank, int power, long long total_particles, int length_per_rank, int nprocs, double box_length, double RAM_GB, double execution_time, const char *device_type);
 
 // GPU Kernels
 __global__ void box_distribution_kernel(t_particle *particles, int N, double L, unsigned long long seed);
