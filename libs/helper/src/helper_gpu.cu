@@ -203,6 +203,7 @@ int distribute_gpu_particles(std::vector<t_particle *> &d_rank_array, std::vecto
 {
     const int nprocs = (int)d_rank_array.size();
 
+    // Sorts vector in gpu.
     for (int dev = 0; dev < nprocs; ++dev)
     {
         cudaSetDevice(dev);
@@ -216,6 +217,7 @@ int distribute_gpu_particles(std::vector<t_particle *> &d_rank_array, std::vecto
 
     gpu_barrier(nprocs, gpu_streams);
 
+    // Gets min-max particle from each vector.
     std::vector<unsigned long long> local_min(nprocs, std::numeric_limits<unsigned long long>::max());
     std::vector<unsigned long long> local_max(nprocs, 0ull);
     for (int dev = 0; dev < nprocs; ++dev)
@@ -230,6 +232,7 @@ int distribute_gpu_particles(std::vector<t_particle *> &d_rank_array, std::vecto
         local_max[dev] = (unsigned long long)last_h.key;
     }
 
+    // Calculates min max global and total lenght
     unsigned long long gmin = std::numeric_limits<unsigned long long>::max();
     unsigned long long gmax = 0ull;
     long long N_global = 0;
@@ -252,10 +255,10 @@ int distribute_gpu_particles(std::vector<t_particle *> &d_rank_array, std::vecto
     {
         const long long target = (N_global * i + nprocs - 1) / nprocs;
         unsigned long long lo = lo_base, hi = gmax;
+        long long c_global = 0;
         while (lo < hi)
         {
             unsigned long long mid = lo + ((hi - lo) >> 1);
-            long long c_global = 0;
             for (int dev = 0; dev < nprocs; ++dev)
             {
                 if (lens[dev] == 0)
@@ -267,6 +270,7 @@ int distribute_gpu_particles(std::vector<t_particle *> &d_rank_array, std::vecto
             else
                 lo = mid + 1;
         }
+        printf("C GLOBAL: %d\n", c_global);
         splitters.push_back(lo);
         lo_base = lo;
     }
