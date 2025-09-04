@@ -171,18 +171,19 @@ int concat_and_serial_write(t_particle **arrays, const int *counts, int nprocs, 
 
 inline void compute_cuts_for_dev(
     int dev,
-    t_particle* d_ptr,
+    t_particle *d_ptr,
     int n,
-    const std::vector<unsigned long long>& splitters, 
-    std::vector<int>& cuts,                            
+    const std::vector<unsigned long long> &splitters,
+    std::vector<int> &cuts,
     cudaStream_t stream)
 {
     cudaSetDevice(dev);
 
-    cuts.assign(splitters.size() + 2, 0); 
+    cuts.assign(splitters.size() + 2, 0);
     cuts[0] = 0;
 
-    if (n <= 0) {                
+    if (n <= 0)
+    {
         cuts.back() = 0;
         return;
     }
@@ -190,31 +191,30 @@ inline void compute_cuts_for_dev(
     thrust::device_ptr<t_particle> first(d_ptr), last(d_ptr + n);
     auto pol = thrust::cuda::par.on(stream);
 
-    // 2) upper_bound para manter a semântica de "≤ Sk" no corte
-    for (size_t b = 0; b < splitters.size(); ++b) {
-        t_particle probe; probe.key = (long long)splitters[b];
+    for (size_t b = 0; b < splitters.size(); ++b)
+    {
+        t_particle probe;
+        probe.key = (long long)splitters[b];
         auto it = thrust::upper_bound(pol, first, last, probe, key_less{});
-        cuts[b + 1] = static_cast<int>(it - first);   // índice final do bucket b
+        cuts[b + 1] = static_cast<int>(it - first);
     }
 
-    // 3) o último corte precisa ser exatamente n
     cuts.back() = n;
-
-    // (Opcional) garantir monotonicidade em debug:
-    // for (size_t i = 1; i < cuts.size(); ++i) assert(cuts[i] >= cuts[i-1]);
 }
+
 long long count_leq_device(
-    int dev, t_particle* d_ptr, int n, unsigned long long mid, cudaStream_t stream)
+    int dev, t_particle *d_ptr, int n, unsigned long long mid, cudaStream_t stream)
 {
-    if (n <= 0) return 0;
-    cudaSetDevice(dev);                             
-    t_particle probe; probe.key = (long long)mid;
+    if (n <= 0)
+        return 0;
+    cudaSetDevice(dev);
+    t_particle probe;
+    probe.key = (long long)mid;
     auto pol = thrust::cuda::par.on(stream);
     thrust::device_ptr<t_particle> first(d_ptr), last(d_ptr + n);
     auto it = thrust::upper_bound(pol, first, last, probe, key_less{});
-    return static_cast<long long>(it - first);       
+    return static_cast<long long>(it - first);
 }
-
 
 int distribute_gpu_particles(std::vector<t_particle *> &d_rank_array, std::vector<int> &lens, std::vector<cudaStream_t> &gpu_streams)
 {
@@ -286,11 +286,11 @@ int distribute_gpu_particles(std::vector<t_particle *> &d_rank_array, std::vecto
             else
                 lo = mid + 1;
         }
-        printf("C GLOBAL: %lld\n", c_global);
-        printf("TARGET: %lld\n", target);
-        printf("lo: %lu\n", lo);
-        printf("high: %lu\n", hi);
-        
+        // printf("C GLOBAL: %lld\n", c_global);
+        // printf("TARGET: %lld\n", target);
+        // printf("lo: %lu\n", lo);
+        // printf("high: %lu\n", hi);
+
         splitters.push_back(lo);
         lo_base = lo;
     }

@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <vector>
 #include <cuda_runtime.h>
+#include <chrono>
 
 #include "helper.hpp"
 
@@ -53,11 +54,6 @@ int main(int argc, char **argv)
 	int minor_r = 0;
 	double RAM_GB = 0.0;
 
-	float gen_ms = 0.0f;
-	double kernel_time_sec = 0.0;
-
-	int seed = 0;
-
 	const int block = 256;
 	int sms = 0;
 
@@ -65,7 +61,6 @@ int main(int argc, char **argv)
 
 	std::vector<t_particle *> d_rank_array(nprocs, nullptr);
 	std::vector<t_particle *> h_host_array(nprocs, nullptr);
-	std::vector<cudaEvent_t> kStart_v(nprocs), kStop_v(nprocs);
 	std::vector<cudaStream_t> gpu_streams(nprocs);
 	std::vector<int> lens(nprocs);
 	enable_p2p_all(nprocs);
@@ -87,7 +82,7 @@ int main(int argc, char **argv)
 		cudaDeviceGetAttribute(&sms, cudaDevAttrMultiProcessorCount, dev);
 		int maxBlocks = sms * 20;
 		int grid = (length_per_rank + block - 1) / block;
-		seed = dev;
+		int seed = dev;
 		if (grid > maxBlocks)
 			grid = maxBlocks;
 
@@ -100,20 +95,27 @@ int main(int argc, char **argv)
 			torus_distribution_kernel<<<grid, block, 0, gpu_streams[dev]>>>(d_rank_array[dev], length_per_rank, major_r, minor_r, box_length, seed);
 			break;
 		}
+	}
 
-		// cudaEventCreate(&kStart_v[dev]);
-		// cudaEventCreate(&kStop_v[dev]);
-		// cudaEventRecord(kStart_v[dev], gpu_streams[dev]);
+	gpu_barrier(nprocs, gpu_streams);
 
-		// cria as keys na gpu.
+	// cria as keys na gpu.
+	auto t0 = std::chrono::steady_clock::now();
+	for (int dev = 0; dev < nprocs; dev++)
+	{
+		cudaSetDevice(dev);
+		cudaDeviceGetAttribute(&sms, cudaDevAttrMultiProcessorCount, dev);
+		int maxBlocks = sms * 20;
+		int grid = (length_per_rank + block - 1) / block;
+		if (grid > maxBlocks)
+			grid = maxBlocks;
 		generate_keys_kernel<<<grid, block, 0, gpu_streams[dev]>>>(d_rank_array[dev], length_per_rank, box_length);
-
-		// cudaEventRecord(kStop_v[dev], gpu_streams[dev]);
-		// cudaMemcpyAsync(h_host_array[dev], d_rank_array[dev], static_cast<size_t>(length_per_rank) * sizeof(t_particle), cudaMemcpyDeviceToHost, gpu_streams[dev]);
 	}
 
 	gpu_barrier(nprocs, gpu_streams);
 	distribute_gpu_particles(d_rank_array, lens, gpu_streams);
+	auto t1 = std::chrono::steady_clock::now();
+	double dist_sec = std::chrono::duration<double>(t1 - t0).count();
 
 	for (int dev = 0; dev < nprocs; ++dev)
 	{
@@ -136,16 +138,6 @@ int main(int argc, char **argv)
 
 	gpu_barrier(nprocs, gpu_streams);
 
-	// calculate time.
-	for (int dev = 0; dev < nprocs; dev++)
-	{
-		cudaSetDevice(dev);
-		cudaEventSynchronize(kStop_v[dev]);
-		cudaEventElapsedTime(&gen_ms, kStart_v[dev], kStop_v[dev]);
-		kernel_time_sec = std::max(kernel_time_sec, static_cast<double>(gen_ms) / 1000.0);
-		cudaStreamSynchronize(gpu_streams[dev]);
-	}
-
 	// write results and log it.
 	if (power < 4)
 	{
@@ -161,14 +153,12 @@ int main(int argc, char **argv)
 		}
 	}
 
-	log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, kernel_time_sec, "gpu");
+	log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, dist_sec, "gpu");
 
 	// Cleans everything
 	for (int dev = 0; dev < nprocs; dev++)
 	{
 		cudaSetDevice(dev);
-		cudaEventDestroy(kStart_v[dev]);
-		cudaEventDestroy(kStop_v[dev]);
 		if (d_rank_array[dev])
 			cudaFreeAsync(d_rank_array[dev], gpu_streams[dev]);
 		if (h_host_array[dev])
