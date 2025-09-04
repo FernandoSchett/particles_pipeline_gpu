@@ -68,6 +68,7 @@ int main(int argc, char **argv)
 	std::vector<cudaEvent_t> kStart_v(nprocs), kStop_v(nprocs);
 	std::vector<cudaStream_t> gpu_streams(nprocs);
 	std::vector<int> lens(nprocs);
+	enable_p2p_all(nprocs);
 
 	for (int dev = 0; dev < nprocs; dev++)
 	{
