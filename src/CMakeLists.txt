@@ -15,16 +15,3 @@ target_compile_options(gpu_p_sfc_exe PRIVATE
 )
 
 # Multi GPU, Multi Node
-add_executable(gpu_mpi_p_sfc_exe gpu_mpi_main_particles.cu)
-set_target_properties(gpu_mpi_p_sfc_exe PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-target_compile_options(gpu_mpi_p_sfc_exe PRIVATE
-  $<$<COMPILE_LANGUAGE:CUDA>:-w>
-  $<$<COMPILE_LANGUAGE:CUDA>:-Xptxas=-w>
-  $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-w>
-)
-target_link_libraries(gpu_mpi_p_sfc_exe
-  PRIVATE
-    P_SFC::helper      
-    CUDA::cudart
-    MPI::MPI_CXX       
-)
