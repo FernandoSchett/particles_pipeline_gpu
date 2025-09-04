@@ -3,4 +3,6 @@ build/
 *.png
 .ipynb_checkpoints
 scripts/*.out
+*.par
+scripts/*.par
 scripts/*.err

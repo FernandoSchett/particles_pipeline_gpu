@@ -148,7 +148,7 @@ int main(int argc, char **argv)
 	// write results and log it.
 	if (power < 4)
 	{
-		sprintf(filename, "particle_file_gpu_n%d_total%lld", nprocs, total_particles);
+		sprintf(filename, "particle_file_gpu_n%d_total%lld.par", nprocs, total_particles);
 		int rc = concat_and_serial_write(h_host_array.data(), lens.data(), nprocs, filename);
 
 		// for (int dev = 0; dev < nprocs; dev++)

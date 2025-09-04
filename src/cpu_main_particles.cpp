@@ -96,7 +96,7 @@ int main(int argc, char **argv)
     MPI_Barrier(MPI_COMM_WORLD);
     end_time = MPI_Wtime();
 
-    sprintf(filename, "particle_file_cpu_n%d_total%lld", nprocs, total_particles);
+    sprintf(filename, "particle_file_cpu_n%d_total%lld.par", nprocs, total_particles);
     parallel_write_to_file(rank_array, length_vector, filename);
 
     if (rank == 0)
