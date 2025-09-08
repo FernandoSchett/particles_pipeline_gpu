@@ -386,3 +386,144 @@ int distribute_gpu_particles(std::vector<t_particle *> &d_rank_array, std::vecto
     gpu_barrier(nprocs, gpu_streams);
     return 0;
 }
+
+static long long count_leq_device2(t_particle *d_ptr, int n, unsigned long long key, cudaStream_t stream)
+{
+    if (n <= 0)
+        return 0;
+    t_particle probe;
+    probe.key = (long long)key;
+    auto pol = thrust::cuda::par.on(stream);
+    thrust::device_ptr<t_particle> first(d_ptr), last(d_ptr + n);
+    auto it = thrust::upper_bound(pol, first, last, probe, key_less{});
+    return static_cast<long long>(it - first);
+}
+
+void distribute_gpu_particles_mpi(t_particle **d_rank_array, int *lens, int *capacity, cudaStream_t stream)
+{
+    int rank, nprocs;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+
+    {
+        auto pol = thrust::cuda::par.on(stream);
+        thrust::device_ptr<t_particle> first(*d_rank_array), last(*d_rank_array + *lens);
+        thrust::sort(pol, first, last, key_less{});
+    }
+
+    unsigned long long local_min = std::numeric_limits<unsigned long long>::max();
+    unsigned long long local_max = 0ull;
+    if (*lens > 0)
+    {
+        t_particle a, b;
+        cudaMemcpyAsync(&a, *d_rank_array, sizeof(t_particle), cudaMemcpyDeviceToHost, stream);
+        cudaMemcpyAsync(&b, *d_rank_array + (*lens - 1), sizeof(t_particle), cudaMemcpyDeviceToHost, stream);
+        cudaStreamSynchronize(stream);
+        local_min = (unsigned long long)a.key;
+        local_max = (unsigned long long)b.key;
+    }
+
+    unsigned long long gmin = 0ull, gmax = 0ull;
+    MPI_Allreduce(&local_min, &gmin, 1, MPI_UNSIGNED_LONG_LONG, MPI_MIN, MPI_COMM_WORLD);
+    MPI_Allreduce(&local_max, &gmax, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, MPI_COMM_WORLD);
+
+    long long N_local = *lens, N_global = 0;
+    MPI_Allreduce(&N_local, &N_global, 1, MPI_LONG_LONG_INT, MPI_SUM, MPI_COMM_WORLD);
+    if (N_global == 0)
+        return;
+
+    std::vector<unsigned long long> splitters;
+    splitters.reserve(nprocs ? nprocs - 1 : 0);
+    unsigned long long lo_base = gmin;
+    for (int i = 1; i < nprocs; ++i)
+    {
+        const long long target = (N_global * i + nprocs - 1) / nprocs;
+        unsigned long long lo = lo_base, hi = gmax;
+        while (lo < hi)
+        {
+            const unsigned long long mid = lo + ((hi - lo) >> 1);
+            long long cnt_local = count_leq_device2(*d_rank_array, *lens, mid, stream);
+            long long cnt_global = 0;
+            MPI_Allreduce(&cnt_local, &cnt_global, 1, MPI_LONG_LONG_INT, MPI_SUM, MPI_COMM_WORLD);
+            if (cnt_global >= target)
+                hi = mid;
+            else
+                lo = mid + 1;
+        }
+        splitters.push_back(lo);
+        lo_base = lo;
+    }
+
+    std::vector<long long> pos(nprocs + 1, 0);
+    {
+        auto pol = thrust::cuda::par.on(stream);
+        thrust::device_ptr<t_particle> first(*d_rank_array), last(*d_rank_array + *lens);
+        for (int i = 0; i < nprocs - 1; ++i)
+        {
+            t_particle probe;
+            probe.key = (long long)splitters[i];
+            auto it = thrust::upper_bound(pol, first, last, probe, key_less{});
+            pos[i + 1] = static_cast<long long>(it - first);
+        }
+        pos[nprocs] = *lens;
+    }
+
+    std::vector<int> send_counts(nprocs, 0);
+    for (int r = 0; r < nprocs; ++r)
+    {
+        long long start = pos[r];
+        long long end = pos[r + 1];
+        long long c = end - start;
+        send_counts[r] = (c > 0) ? static_cast<int>(c) : 0;
+    }
+
+    std::vector<int> recv_counts(nprocs, 0);
+    MPI_Alltoall(send_counts.data(), 1, MPI_INT, recv_counts.data(), 1, MPI_INT, MPI_COMM_WORLD);
+
+    std::vector<int> send_displs(nprocs, 0), recv_displs(nprocs, 0);
+    for (int i = 1; i < nprocs; ++i)
+    {
+        send_displs[i] = send_displs[i - 1] + send_counts[i - 1];
+        recv_displs[i] = recv_displs[i - 1] + recv_counts[i - 1];
+    }
+    const int total_send = send_displs.back() + send_counts.back();
+    const int total_recv = recv_displs.back() + recv_counts.back();
+
+    t_particle *d_tmp = nullptr;
+    if (total_recv > 0)
+        cudaMallocAsync(&d_tmp, (size_t)total_recv * sizeof(t_particle), stream);
+    else
+        cudaMallocAsync(&d_tmp, 1, stream);
+
+    std::vector<int> send_counts_bytes(nprocs), recv_counts_bytes(nprocs), send_displs_bytes(nprocs), recv_displs_bytes(nprocs);
+    for (int i = 0; i < nprocs; ++i)
+    {
+        send_counts_bytes[i] = send_counts[i] * (int)sizeof(t_particle);
+        recv_counts_bytes[i] = recv_counts[i] * (int)sizeof(t_particle);
+        send_displs_bytes[i] = send_displs[i] * (int)sizeof(t_particle);
+        recv_displs_bytes[i] = recv_displs[i] * (int)sizeof(t_particle);
+    }
+
+    cudaStreamSynchronize(stream);
+    MPI_Alltoallv(
+        *d_rank_array, send_counts_bytes.data(), send_displs_bytes.data(), MPI_BYTE,
+        d_tmp, recv_counts_bytes.data(), recv_displs_bytes.data(), MPI_BYTE,
+        MPI_COMM_WORLD);
+
+    if (total_recv > *capacity)
+    {
+        if (*d_rank_array)
+            cudaFree(*d_rank_array);
+        cudaMalloc(d_rank_array, (size_t)total_recv * sizeof(t_particle));
+        *capacity = total_recv;
+    }
+
+    if (total_recv > 0)
+    {
+        cudaMemcpyAsync(*d_rank_array, d_tmp, (size_t)total_recv * sizeof(t_particle), cudaMemcpyDeviceToDevice, stream);
+    }
+    *lens = total_recv;
+
+    cudaStreamSynchronize(stream);
+    cudaFreeAsync(d_tmp, stream);
+}

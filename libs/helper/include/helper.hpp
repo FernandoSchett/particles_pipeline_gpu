@@ -3,45 +3,46 @@
 
 #include <iostream>
 #include <fstream>
-#include <vector>
 #include <array>
+#include <vector>
+#include <list>
+#include <set>
+#include <algorithm>
+#include <numeric>
+#include <cassert>
 #include <cstring>
-#include <stdlib.h>
-#include <math.h>
-#include <mpi.h>
+
+#include <cstdlib>
+#include <cmath>
+#include <ctime>
+
+#include <sys/stat.h>
+
 #include <cuda_runtime.h>
+#include <mpi.h>
 
 #include <Random123/philox.h>
 #include <Random123/uniform.hpp>
+
 #include <boost/sort/spreadsort/integer_sort.hpp>
 
 #include <thrust/device_ptr.h>
+#include <thrust/system/cuda/execution_policy.h>
 #include <thrust/sort.h>
 #include <thrust/binary_search.h>
-#include <thrust/system/cuda/execution_policy.h>
-#include <algorithm>
-#include <vector>
-#include <numeric>
-#include <cassert>
-
-#include <list>
-#include <set>
-#include <cmath>
-#include <cstdlib>
-#include <ctime>
-#include <time.h>
-#include <sys/stat.h>
+#include <thrust/functional.h>
 
 #define CUDA_RT_CALL(call)                                                                  \
     {                                                                                       \
         cudaError_t cudaStatus = call;                                                      \
-        if (cudaSuccess != cudaStatus) {                                                    \
+        if (cudaSuccess != cudaStatus)                                                      \
+        {                                                                                   \
             fprintf(stderr,                                                                 \
                     "ERROR: CUDA RT call \"%s\" in line %d of file %s failed "              \
                     "with "                                                                 \
                     "%s (%d).\n",                                                           \
                     #call, __LINE__, __FILE__, cudaGetErrorString(cudaStatus), cudaStatus); \
-            exit( cudaStatus );                                                             \
+            exit(cudaStatus);                                                               \
         }                                                                                   \
     }
 
@@ -107,5 +108,7 @@ int concat_and_serial_write(t_particle **arrays, const int *counts, int nprocs, 
 int distribute_gpu_particles(std::vector<t_particle *> &d_rank_array, std::vector<int> &lens, std::vector<cudaStream_t> &gpu_streams);
 void compute_cuts_for_dev(int dev, t_particle *d_ptr, int n, const std::vector<unsigned long long> &splitters, std::vector<int> &cuts_out, cudaStream_t stream);
 long long count_leq_device(int dev, t_particle *d_ptr, int n, unsigned long long mid, cudaStream_t stream);
+
+void distribute_gpu_particles_mpi(t_particle **d_rank_array, int *lens, int *capacity, cudaStream_t stream);
 
 #endif

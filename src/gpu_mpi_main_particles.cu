@@ -1,3 +1,4 @@
+#include <iostream>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -37,6 +38,8 @@ void parse_args(int argc, char **argv, int *power, dist_type_t *dist_type)
     }
 }
 
+void distribute_gpu_particles_mpi(t_particle **d_rank_array, int *lens, int *capacity, cudaStream_t stream);
+
 int main(int argc, char **argv)
 {
     MPI_Init(&argc, &argv);
@@ -64,6 +67,7 @@ int main(int argc, char **argv)
     int major_r = 0;
     int minor_r = 0;
     double RAM_GB = 0.0;
+    int capacity = 0;
 
     const int block = 256;
     int sms = 0;
@@ -83,6 +87,7 @@ int main(int argc, char **argv)
 
     cudaMallocAsync(&d_rank_array, length_per_rank * sizeof(t_particle), gpu_stream);
     cudaMallocHost(&h_host_array, length_per_rank * sizeof(t_particle));
+    capacity = length_per_rank;
 
     cudaDeviceGetAttribute(&sms, cudaDevAttrMultiProcessorCount, local_dev);
     int maxBlocks = sms * 20;
@@ -111,13 +116,15 @@ int main(int argc, char **argv)
     cudaStreamSynchronize(gpu_stream);
     MPI_Barrier(MPI_COMM_WORLD);
 
-    distribute_gpu_particles_mpi(d_rank_array, &lens, gpu_stream);
+    distribute_gpu_particles_mpi(&d_rank_array, &length_per_rank, &capacity, gpu_stream);
 
     cudaStreamSynchronize(gpu_stream);
     MPI_Barrier(MPI_COMM_WORLD);
 
     auto t1 = std::chrono::steady_clock::now();
     double dist_sec = std::chrono::duration<double>(t1 - t0).count();
+
+    lens = length_per_rank;
 
     if (power < 4)
     {
