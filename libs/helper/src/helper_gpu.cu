@@ -219,8 +219,6 @@ long long count_leq_device(
 int distribute_gpu_particles(std::vector<t_particle *> &d_rank_array, std::vector<int> &lens, std::vector<cudaStream_t> &gpu_streams)
 {
     const int nprocs = (int)d_rank_array.size();
-    enable_p2p_all(nprocs);
-
     for (int dev = 0; dev < nprocs; ++dev)
     {
         cudaSetDevice(dev);
