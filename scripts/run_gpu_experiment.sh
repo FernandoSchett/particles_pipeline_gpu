@@ -1,8 +1,6 @@
 #!/bin/bash
 source ./load_modules.sh
 
-module list 
-
 distribuition=$1
 power_particles=$2
 times=$3

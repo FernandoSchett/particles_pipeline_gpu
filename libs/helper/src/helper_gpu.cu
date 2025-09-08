@@ -535,5 +535,5 @@ void distribute_gpu_particles_mpi(t_particle **d_rank_array, int *lens, int *cap
         cudaStreamSynchronize(stream);
     }
 
-    printf("rank %d: %d\n", rank, *lens);
+    printf("After distribution: rank %d: %d\n", rank, *lens);
 }

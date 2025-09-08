@@ -6,7 +6,7 @@ TIMES=1
 
 for pp in 3
 do
-    for ngpu in 2 4  
+    for ngpu in 2 4 5 6 8 9 12 16
     do
         NODES=$(( (ngpu + GPU_PER_NODE - 1) / GPU_PER_NODE ))
         echo "Submitting job: np=$ngpu, nodes=$NODES, partition=$PARTITION"
