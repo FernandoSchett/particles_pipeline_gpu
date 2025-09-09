@@ -1,5 +1,7 @@
 #!/bin/bash 
 
+cd "$(dirname "$0")"
+
 GPU_PER_NODE=4 
 PARTITION=dc-gpu
 TIMES=5

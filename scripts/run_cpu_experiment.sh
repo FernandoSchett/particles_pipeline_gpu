@@ -1,4 +1,6 @@
 #!/bin/bash
+cd "$(dirname "$0")"
+
 source ./load_modules.sh
 
 NP=$1

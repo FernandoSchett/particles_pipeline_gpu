@@ -1,5 +1,7 @@
 #!/bin/bash
 
+cd "$(dirname "$0")"
+
 CORES_PER_NODE=128 
 PARTITION=dc-cpu
 TIMES=5
