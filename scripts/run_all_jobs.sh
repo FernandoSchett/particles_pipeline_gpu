@@ -1,4 +1,4 @@
-cd "$(dirname "$0")/"
+source ./load_modules.sh
 
 sh ./compile.sh
 

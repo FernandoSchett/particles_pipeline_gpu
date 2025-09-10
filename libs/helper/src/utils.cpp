@@ -69,12 +69,12 @@ void log_results(int rank, int power, long long total_particles, int length_per_
 		std::fprintf(f, "datetime,power,total_particles,length_per_rank,num_procs,box_length,RAM_GB,execution_time,device\n");
 	}
 
-	std::fprintf(f, "%s,%d,%lld,%d,%d,%.1f,%.2f,%f,gpu\n",
+	std::fprintf(f, "%s,%d,%lld,%d,%d,%.1f,%.2f,%f,%s\n",
 				 time_str, power, total_particles, length_per_rank, nprocs,
-				 box_length, RAM_GB, execution_time);
-	std::printf("%s,%d,%lld,%d,%d,%.1f,%.2f,%f,gpu\n",
+				 box_length, RAM_GB, execution_time, device_type);
+	std::printf("%s,%d,%lld,%d,%d,%.1f,%.2f,%f,%s\n",
 				time_str, power, total_particles, length_per_rank, nprocs,
-				box_length, RAM_GB, execution_time);
+				box_length, RAM_GB, execution_time, device_type);
 
 	std::fclose(f);
 }

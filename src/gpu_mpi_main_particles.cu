@@ -11,7 +11,7 @@
 #include <mpi.h>
 
 #include "particle_types.hpp"
-#include "particles_gpu.hpp"
+#include "particles_gpu.hcu"
 #include "file_handling.hpp"
 #include "utils.hpp"
 

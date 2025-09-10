@@ -1,7 +1,6 @@
 #!/bin/bash
-cd "$(dirname "$0")"
 
-source ./load_modules.sh
+source ./load_modules_gpu.sh
 
 distribuition=$1
 power_particles=$2

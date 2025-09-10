@@ -2,8 +2,10 @@
 
 cd "$(dirname "$0")"
 
+source ./load_modules_cpu.sh
+
 CORES_PER_NODE=128 
-PARTITION=dc-cpu
+PARTITION=batch
 TIMES=5
 
 for pp in 3 

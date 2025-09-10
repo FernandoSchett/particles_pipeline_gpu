@@ -3,14 +3,14 @@
 cd "$(dirname "$0")"
 
 GPU_PER_NODE=4 
-PARTITION=dc-gpu
+PARTITION=booster
 TIMES=5
 
-# 1 2 4 8 16 32 64 128 256
-# 5 6 8 9 12 16 32 64
+# 1 2 4 6 8 12 16 32 50 64 128 256
+# 1 2 4 6 8 12 16 32 50 64 
 for pp in 3
 do
-    for ngpu in 2 4 
+    for ngpu in 4 
     do
         NODES=$(( (ngpu + GPU_PER_NODE - 1) / GPU_PER_NODE ))
         echo "Submitting GPU job: np=$ngpu, nodes=$NODES, partition=$PARTITION"

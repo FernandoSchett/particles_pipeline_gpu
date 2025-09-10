@@ -1,7 +1,5 @@
 #!/bin/bash
-cd "$(dirname "$0")"
-
-source ./load_modules.sh
+source ./load_modules_cpu.sh
 
 NP=$1
 distribuition=$2
