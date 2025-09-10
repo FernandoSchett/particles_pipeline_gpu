@@ -1,15 +1,17 @@
 #!/bin/bash 
 
 GPU_PER_NODE=4 
-PARTITION=booster
-TIMES=1
+PARTITION=dc-gpu
+TIMES=5
 
+# 1 2 4 8 16 32 64 128 256
+# 5 6 8 9 12 16 32 64
 for pp in 3
 do
-    for ngpu in 2 4 5 6 8 9 12 16
+    for ngpu in 2 4 
     do
         NODES=$(( (ngpu + GPU_PER_NODE - 1) / GPU_PER_NODE ))
-        echo "Submitting job: np=$ngpu, nodes=$NODES, partition=$PARTITION"
+        echo "Submitting GPU job: np=$ngpu, nodes=$NODES, partition=$PARTITION"
         
         sbatch \
             --nodes=$NODES \

@@ -174,19 +174,21 @@ int main(int argc, char **argv)
 
         if (rank == 0)
         {
-            sprintf(filename, "particle_file_gpu_n%d_total%lld.par", nprocs, total_particles);
-            std::vector<t_particle *> host_ptrs(nprocs, nullptr);
-            for (int i = 0; i < nprocs; ++i)
-                host_ptrs[i] = reinterpret_cast<t_particle *>(gather_buf.data() + recv_displs[i]);
-            int rc = concat_and_serial_write(host_ptrs.data(), recv_lens.data(), nprocs, filename);
-            if (rc != 0)
-            {
-                std::cerr << "Error at writing file, rc=" << rc << "\n";
+            log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, dist_sec, "gpu");
+            if(power < 4){
+                sprintf(filename, "particle_file_gpu_n%d_total%lld.par", nprocs, total_particles);
+                std::vector<t_particle *> host_ptrs(nprocs, nullptr);
+                for (int i = 0; i < nprocs; ++i)
+                    host_ptrs[i] = reinterpret_cast<t_particle *>(gather_buf.data() + recv_displs[i]);
+                int rc = concat_and_serial_write(host_ptrs.data(), recv_lens.data(), nprocs, filename);
+                if (rc != 0)
+                {
+                    std::cerr << "Error at writing file, rc=" << rc << "\n";
+                }
             }
         }
     }
 
-    log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, dist_sec, "gpu");
 
     if (d_rank_array)
         cudaFreeAsync(d_rank_array, gpu_stream);

@@ -11,15 +11,23 @@
 3. (OPTIONAL) If in a supercomputer:
 
          source scripts/load_modules.sh
-4. Run:
+   
+4. Compile:
 
-         sh scripts/run_program.sh <number_processes> <initial_distribution> <power_to_particle_numbers>
+         sh scripts/compile.sh
 
-5. See Results:
+
+5.  Run:
+
+        ./build./src/p_sfc_exe <distribution_name> <power_particles>
+    
+        ./build./src/gpu_mpi_p_sfc_exe <distribution_name> <power_particles>
+   
+7. See Results (Only if power_particles < 4):
 
             source scripts/setup_py_env.sh
             python3 visualize.py
-
+ 
 ## How reproduce the experiments:
 
 1. Run:

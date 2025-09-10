@@ -1,3 +1,5 @@
+cd "$(dirname "$0")/"
+
 sh ./compile.sh
 
 # call other experiments
