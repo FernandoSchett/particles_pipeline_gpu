@@ -10,8 +10,10 @@ enable_language(CUDA)
 
 # Create TARGET (Helper Library)
 add_library(helper
-  src/helper.cpp
-  src/helper_gpu.cu 
+  src/utils.cpp
+  src/file_handling.cpp
+  src/particles_cpu.cpp
+  src/particles_gpu.cu
 )
 
 # Define librarie properties
@@ -30,10 +32,11 @@ target_include_directories(helper
 
 target_link_libraries(helper
   PUBLIC
-    Boost::headers
     MPI::MPI_CXX
-    third_party::random123
     CUDA::cudart  
+  PRIVATE
+    third_party::random123
+    Boost::headers
 )
 
 

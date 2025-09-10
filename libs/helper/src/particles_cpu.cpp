@@ -1,4 +1,4 @@
-#include "./helper.hpp"
+#include "particles_cpu.h"
 
 MPI_Datatype MPI_particle;
 int register_MPI_Particle(MPI_Datatype *MPI_Particle)
@@ -130,107 +130,19 @@ int torus_distribution(t_particle **particle_array, int count, double major_r, d
     return 0;
 }
 
-int parallel_write_to_file(t_particle *particle_array, int *count, char *filename)
+int generate_particles_keys(t_particle *particle_array, int count, double box_length)
 {
-    int access_mode;
-    MPI_File fh;
-    MPI_Status status;
-    MPI_Offset disp, rank_offset, init_ind_ptr, fin_ind_ptr, init_shr_ptr, fin_shr_ptr;
-    int p_rank, nprocs, particle_type_size;
-    long long int tnp;
-    MPI_Type_size(MPI_particle, &particle_type_size);
-    MPI_Comm_rank(MPI_COMM_WORLD, &p_rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
-
-    access_mode = MPI_MODE_CREATE | MPI_MODE_RDWR;
-    MPI_File_open(MPI_COMM_WORLD, filename, access_mode, MPI_INFO_NULL, &fh);
-
-    if (p_rank == 0)
-    {
-        tnp = 0;
-        for (int i = 0; i < nprocs; i++)
-        {
-            tnp += count[i];
-        }
-        MPI_File_write(fh, &tnp, 1, MPI_LONG_LONG_INT, &status);
-    }
-
-    rank_offset = 8;
-    for (int i = 0; i < p_rank; i++)
-    {
-        rank_offset += count[i] * particle_type_size;
-    }
-    MPI_File_seek(fh, rank_offset, MPI_SEEK_SET);
-
-    MPI_File_write(fh, particle_array, count[p_rank], MPI_particle, &status);
-
-    MPI_File_close(&fh);
-    return 0;
-}
-
-int serial_write_to_file(t_particle *particle_array, int count, char *filename)
-{
-    std::fstream file;
-    long long int ll_count;
-
-    file.open(filename, std::ios::out | std::ios::binary | std::ios::trunc);
-    ll_count = count;
-    file.write(reinterpret_cast<char *>(&ll_count), 8);
+    std::vector<t_particle *> particles;
+    particles.reserve(count);
 
     for (int i = 0; i < count; i++)
     {
-        file.write(reinterpret_cast<char *>(&particle_array[i].mpi_rank), 4);
-        file.write(reinterpret_cast<char *>(&particle_array[i].key), 8);
-        file.write(reinterpret_cast<char *>(&particle_array[i].coord[0]), 8);
-        file.write(reinterpret_cast<char *>(&particle_array[i].coord[1]), 8);
-        file.write(reinterpret_cast<char *>(&particle_array[i].coord[2]), 8);
+        particles.push_back(&particle_array[i]);
     }
 
-    file.close();
-    return 0;
-}
+    std::array<double, 3> origin = {0.0, 0.0, 0.0};
+    run_oct_tree_recursive(particles, 0, 0, box_length, origin);
 
-int serial_read_from_file(t_particle **particle_array, int *count, char *filename)
-{
-    std::fstream file;
-    long long int ll_count;
-    int temp_rank;
-    long long int temp_key;
-    double temp_coords;
-    char bytes[256];
-
-    file.open(filename, std::ios::in | std::ios::binary);
-
-    file.read(bytes, 8);
-    std::memcpy(&ll_count, bytes, sizeof(long long int));
-    *count = ll_count;
-
-    (*particle_array) = (t_particle *)malloc((*count) * sizeof(t_particle));
-
-    for (int i = 0; i < *count; i++)
-    {
-        file.read(bytes, 4);
-        std::memcpy(&temp_rank, bytes, 4);
-        (*particle_array)[i].mpi_rank = temp_rank;
-
-        file.read(bytes, 8);
-        std::memcpy(&temp_key, bytes, 8);
-        (*particle_array)[i].key = temp_key;
-
-        file.read(bytes, 8);
-        std::memcpy(&temp_coords, bytes, 8);
-        (*particle_array)[i].coord[0] = temp_coords;
-
-        file.read(bytes, 8);
-        std::memcpy(&temp_coords, bytes, 8);
-        (*particle_array)[i].coord[1] = temp_coords;
-
-        file.read(bytes, 8);
-        std::memcpy(&temp_coords, bytes, 8);
-        (*particle_array)[i].coord[2] = temp_coords;
-    }
-
-    file.close();
     return 0;
 }
 
@@ -286,22 +198,6 @@ void run_oct_tree_recursive(std::vector<t_particle *> &particles, int depth, lon
             run_oct_tree_recursive(octants[i], depth + 1, new_key, half, new_origin);
         }
     }
-}
-
-int generate_particles_keys(t_particle *particle_array, int count, double box_length)
-{
-    std::vector<t_particle *> particles;
-    particles.reserve(count);
-
-    for (int i = 0; i < count; i++)
-    {
-        particles.push_back(&particle_array[i]);
-    }
-
-    std::array<double, 3> origin = {0.0, 0.0, 0.0};
-    run_oct_tree_recursive(particles, 0, 0, box_length, origin);
-
-    return 0;
 }
 
 static inline bool key_less(const t_particle &a, const t_particle &b)
@@ -476,78 +372,4 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
 
     printf("Rank %d, Number Particles: %d\n", rank, *particle_vector_size);
     return 0;
-}
-
-void print_particles(t_particle *particle_array, int size, int rank)
-{
-    for (int i = 0; i < size; i++)
-    {
-        printf("P_rank: %d, %d, %f, %f, %f, key: %lld, key_bin: ",
-               rank, particle_array[i].mpi_rank,
-               particle_array[i].coord[0],
-               particle_array[i].coord[1],
-               particle_array[i].coord[2],
-               particle_array[i].key);
-
-        for (int b = 63; b >= 0; b--)
-        {
-            printf("%lld", (particle_array[i].key >> b) & 1LL);
-        }
-
-        printf("\n");
-    }
-}
-
-void setup_particles_box_length(int power, int nprocs, int rank, int *length_per_rank, double *box_length, long long *total_particles, double *RAM_GB, int *major_r, int *minor_r)
-{
-    const long long slice = static_cast<long long>(std::pow(10, power) / nprocs);
-    *total_particles = ((1 + nprocs) * nprocs / 2) * slice;
-    *RAM_GB = (*total_particles * 40.0) / 1e9; // sizeof(t_particle) is 36, but it can be considered as 40.
-    *box_length = std::pow(10, power);
-    *length_per_rank = (rank + 1) * slice;
-    *major_r = 4 * std::pow(10, power - 1);
-    *minor_r = 2 * std::pow(10, power - 1);
-
-    if (rank == nprocs - 1)
-    {
-        *length_per_rank += *total_particles % nprocs;
-    }
-
-    if (rank == 0)
-    {
-        std::printf("%lld particles distributed like (rank_number*%lld) between %d processes in a %.1f sized box using %.4f GBs.\n",
-                    *total_particles, slice, nprocs, *box_length, *RAM_GB);
-    }
-}
-
-
-
-void log_results(int rank, int power, long long total_particles, int length_per_rank, int nprocs, double box_length, double RAM_GB, double execution_time, const char *device_type)
-{
-	time_t rawtime;
-	std::tm *timeinfo;
-	char time_str[64];
-
-	std::time(&rawtime);
-	timeinfo = std::localtime(&rawtime);
-	std::strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", timeinfo);
-
-	struct stat buffer;
-	const char *results_path = "../../results.csv";
-	const int file_exists = (stat(results_path, &buffer) == 0);
-
-	FILE *f = std::fopen(results_path, "a");
-	if (!file_exists)
-	{
-		std::fprintf(f, "datetime,power,total_particles,length_per_rank,num_procs,box_length,RAM_GB,execution_time,device\n");
-	}
-
-	std::fprintf(f, "%s,%d,%lld,%d,%d,%.1f,%.2f,%f,gpu\n",
-				 time_str, power, total_particles, length_per_rank, nprocs,
-				 box_length, RAM_GB, execution_time);
-	std::printf("%s,%d,%lld,%d,%d,%.1f,%.2f,%f,gpu\n",
-				time_str, power, total_particles, length_per_rank, nprocs,
-				box_length, RAM_GB, execution_time);
-
-	std::fclose(f);
 }
