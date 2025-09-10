@@ -12,8 +12,6 @@
 
 #include "particle_types.hpp"
 
-int register_MPI_Particle(MPI_Datatype *MPI_Particle);
-
 int parallel_write_to_file(t_particle *particle_array, int *count, char *filename);
 int serial_write_to_file(t_particle *particle_array, int count, char *filename);
 int serial_read_from_file(t_particle **particle_array, int *count, char *filename);

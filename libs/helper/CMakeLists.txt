@@ -34,7 +34,6 @@ target_link_libraries(helper
   PUBLIC
     MPI::MPI_CXX
     CUDA::cudart  
-  PRIVATE
     third_party::random123
     Boost::headers
 )

@@ -1,4 +1,4 @@
-#include "file_handling.h"
+#include "file_handling.hpp"
 
 MPI_Datatype MPI_particle;
 int concat_and_serial_write(t_particle **arrays, const int *counts, int nprocs, const char *filename)

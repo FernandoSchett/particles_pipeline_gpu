@@ -1,4 +1,4 @@
-#include "particles_cpu.h"
+#include "particles_cpu.hpp"
 
 MPI_Datatype MPI_particle;
 int register_MPI_Particle(MPI_Datatype *MPI_Particle)

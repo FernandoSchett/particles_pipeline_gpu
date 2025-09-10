@@ -10,7 +10,11 @@
 #include <chrono>
 #include <mpi.h>
 
-#include "helper.hpp"
+#include "particle_types.hpp"
+#include "particles_gpu.hpp"
+#include "file_handling.hpp"
+#include "utils.hpp"
+
 
 #define DEFAULT_POWER 3
 

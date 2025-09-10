@@ -9,7 +9,10 @@
 #include <time.h>
 #include <sys/stat.h>
 
-#include "helper.hpp"
+#include "particle_types.hpp"
+#include "particles_cpu.hpp"
+#include "file_handling.hpp"
+#include "utils.hpp"
 
 #define DEFAULT_POWER 3
 

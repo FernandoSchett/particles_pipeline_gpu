@@ -1,4 +1,4 @@
-#include "particles_gpu.hpp"
+#include "particles_gpu.hcu"
 
 #define CUDA_RT_CALL(call)                                                                  \
     {                                                                                       \
@@ -190,7 +190,7 @@ long long count_leq_device(int dev, t_particle *d_ptr, int n, unsigned long long
     return static_cast<long long>(it - first);
 }
 
-static long long count_leq_device2(t_particle *d_ptr, int n, unsigned long long key, cudaStream_t stream)
+long long count_leq_device2(t_particle *d_ptr, int n, unsigned long long key, cudaStream_t stream)
 {
     if (n <= 0)
         return 0;

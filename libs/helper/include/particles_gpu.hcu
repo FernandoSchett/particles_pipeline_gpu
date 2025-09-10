@@ -1,19 +1,24 @@
 #ifndef PARTICLESGPU_H
 #define PARTICLESGPU_H
 
-#include <vector>
-#include <Random123/philox.h>
-#include <Random123/uniform.hpp>
-#include <cuda_runtime_api.h>
-#include "particle_types.hpp"
-
-#include <thrust/device_ptr.h>
-#include <thrust/sort.h>
-#include <thrust/functional.h>
-#include <thrust/execution_policy.h>
+#include <cstdio>
 #include <limits>
 #include <numeric>
-#include <cstdio>
+#include <vector>
+
+#include <mpi.h>                    
+#include <cuda_runtime_api.h>      
+
+#include <Random123/philox.h>       
+#include <Random123/uniform.hpp>
+
+#include <thrust/binary_search.h>   
+#include <thrust/device_ptr.h>
+#include <thrust/sort.h>
+#include <thrust/system/cuda/execution_policy.h>
+
+#include "particle_types.hpp"
+
 
 // GPU Kernels
 __global__ void box_distribution_kernel(t_particle *particles, int N, double L, unsigned long long seed);

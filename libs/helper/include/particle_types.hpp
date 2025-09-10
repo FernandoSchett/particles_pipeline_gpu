@@ -4,6 +4,15 @@
 #include <cstdint>
 #include <cstddef>
 
+#if !defined(__CUDACC__)
+  #ifndef __host__
+    #define __host__
+  #endif
+  #ifndef __device__
+    #define __device__
+  #endif
+#endif
+
 typedef struct particle
 {
     int mpi_rank;
@@ -21,14 +30,13 @@ typedef enum
 #define NPROPS_PARTICLE 3
 #define MAX_DEPTH 15
 
-struct key_less
-{
-    __host__ __device__ bool operator()(const t_particle &a, const t_particle &b) const
-    {
+struct key_less {
+    __host__ __device__ inline
+    bool operator()(const t_particle& a, const t_particle& b) const {
         return (unsigned long long)a.key < (unsigned long long)b.key;
     }
 };
 
-extern MPI_Datatype MPI_particle;
+
 
 #endif
