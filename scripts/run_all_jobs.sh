@@ -1,4 +1,6 @@
-source ./load_modules.sh
+cd "$(dirname "$0")"
+
+source load_modules_cpu.sh
 
 sh ./compile.sh
 
