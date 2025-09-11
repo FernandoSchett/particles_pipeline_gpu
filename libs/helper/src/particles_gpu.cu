@@ -202,10 +202,10 @@ long long count_leq_device2(t_particle *d_ptr, int n, unsigned long long key, cu
     return static_cast<long long>(it - first);
 }
 
-
-struct ExtractKey {
-    __host__ __device__
-    unsigned long long operator()(const t_particle& p) const {
+struct ExtractKey
+{
+    __host__ __device__ unsigned long long operator()(const t_particle &p) const
+    {
         return static_cast<unsigned long long>(p.key);
     }
 };
@@ -217,17 +217,16 @@ void distribute_gpu_particles_mpi(t_particle **d_rank_array, int *lens, int *cap
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
 
     {
-    	auto pol = thrust::cuda::par.on(stream);
-    	thrust::device_ptr<t_particle> first(*d_rank_array);
-    	const int n = *lens;
-    	if (n > 1)
+        auto pol = thrust::cuda::par.on(stream);
+        thrust::device_ptr<t_particle> first(*d_rank_array);
+        const int n = *lens;
+        if (n > 1)
         {
-		thrust::device_vector<unsigned long long> d_keys(n);
-        	thrust::transform(pol, first, first + n, d_keys.begin(), ExtractKey{});
-        	thrust::sort_by_key(pol, d_keys.begin(), d_keys.end(), first);
-    	}
+            thrust::device_vector<unsigned long long> d_keys(n);
+            thrust::transform(pol, first, first + n, d_keys.begin(), ExtractKey{});
+            thrust::sort_by_key(pol, d_keys.begin(), d_keys.end(), first);
+        }
     }
-
 
     unsigned long long local_min = std::numeric_limits<unsigned long long>::max();
     unsigned long long local_max = 0ull;
