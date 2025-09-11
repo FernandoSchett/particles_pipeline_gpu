@@ -19,7 +19,7 @@ do
             --nodes=$NODES \
             --ntasks=$np \
             --cpus-per-task=1 \
-            --time=01:00:00 \
+            --time=05:00:00 \
             --partition=$PARTITION \
             --account=gsp25 \
             --job-name=exp_pp${pp}_np${np} \

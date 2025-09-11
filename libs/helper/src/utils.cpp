@@ -27,18 +27,17 @@ void print_particles(t_particle *particle_array, int size, int rank)
 
 void setup_particles_box_length(int power, int nprocs, int rank, int *length_per_rank, double *box_length, long long *total_particles, double *RAM_GB, int *major_r, int *minor_r)
 {
-    const long long slice = static_cast<long long>(std::pow(10, power) / nprocs);
-    *total_particles = ((1 + nprocs) * nprocs / 2) * slice;
-    *RAM_GB = (*total_particles * 40.0) / 1e9; // sizeof(t_particle) is 36, but it can be considered as 40.
-    *box_length = std::pow(10, power);
-    *length_per_rank = (rank + 1) * slice;
-    *major_r = 4 * std::pow(10, power - 1);
-    *minor_r = 2 * std::pow(10, power - 1);
+    const long long base = static_cast<long long>(std::pow(10.0, power));
+    const long long T = static_cast<long long>(nprocs) * (nprocs + 1) / 2;
+    const long long slice = base / T;
+    const long long rem = base - slice * T;
 
-    if (rank == nprocs - 1)
-    {
-        *length_per_rank += *total_particles % nprocs;
-    }
+    *total_particles = base;
+    *box_length = std::pow(10.0, power);
+    *length_per_rank = static_cast<int>((static_cast<long long>(rank + 1) * slice) + ((rank == nprocs - 1) ? rem : 0));
+    *major_r = static_cast<int>(4 * std::pow(10.0, power - 1));
+    *minor_r = static_cast<int>(2 * std::pow(10.0, power - 1));
+    *RAM_GB = (*total_particles * 40.0) / 1e9;
 
     if (rank == 0)
     {

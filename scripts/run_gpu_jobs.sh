@@ -18,12 +18,12 @@ do
             --ntasks=$ngpu \
             --cpus-per-task=1 \
             --gpus-per-task=1 \
-            --time=01:00:00 \
+            --time=05:00:00 \
             --partition=$PARTITION \
             --account=gsp25 \
             --job-name=exp_pp${pp}_gpu${ngpu} \
             --output=exp_pp${pp}_gpu${ngpu}_%j.out \
             --error=exp_pp${pp}_gpu${ngpu}_%j.err \
-            ./run_gpu_experiment.sh box $pp $TIMES $ngpu
+            ./run_gpu_experiment.sh torus $pp $TIMES $ngpu
     done
 done

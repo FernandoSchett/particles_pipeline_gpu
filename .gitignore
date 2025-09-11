@@ -6,3 +6,4 @@ scripts/*.out
 *.par
 scripts/*.par
 scripts/*.err
+scripts/*jwc
