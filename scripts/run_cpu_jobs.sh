@@ -9,6 +9,11 @@ PARTITION=batch
 TIMES=5
 
 LOGDIR="cpu_logdir"
+
+if [ -d "$LOGDIR" ]; then
+  rm -rf "$LOGDIR"
+fi
+
 mkdir -p "$LOGDIR"
 
 for pp in 8 9 

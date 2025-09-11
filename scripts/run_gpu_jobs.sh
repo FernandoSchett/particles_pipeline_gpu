@@ -7,6 +7,11 @@ PARTITION=booster
 TIMES=5
 
 LOGDIR="gpu_logdir"
+
+if [ -d "$LOGDIR" ]; then
+  rm -rf "$LOGDIR"
+fi
+
 mkdir -p "$LOGDIR"
 
 for pp in 8 9
