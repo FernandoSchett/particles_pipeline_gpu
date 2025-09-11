@@ -6,7 +6,7 @@ GPU_PER_NODE=4
 PARTITION=booster
 TIMES=5
 
-LOGDIR = "gpu_logdir"
+LOGDIR="gpu_logdir"
 mkdir -p "$LOGDIR"
 
 for pp in 8 9

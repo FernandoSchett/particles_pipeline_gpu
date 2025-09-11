@@ -8,7 +8,7 @@ CORES_PER_NODE=48
 PARTITION=batch
 TIMES=5
 
-LOGDIR = "cpu_logdir"
+LOGDIR="cpu_logdir"
 mkdir -p "$LOGDIR"
 
 for pp in 8 9 

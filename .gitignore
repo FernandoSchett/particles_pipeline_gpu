@@ -5,5 +5,5 @@ build/
 scripts/*.out
 *.par
 scripts/*.par
-scripts/*.err
+scripts/*_logdir/
 scripts/*jwc
