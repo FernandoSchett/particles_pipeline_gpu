@@ -95,13 +95,14 @@ int main(int argc, char **argv)
     // distribute_particles(&rank_array, &length_per_rank, nprocs);
 
     // Update length_vector
-    MPI_Allgather(&length_per_rank, 1, MPI_INT, length_vector, 1, MPI_INT, MPI_COMM_WORLD);
-
     MPI_Barrier(MPI_COMM_WORLD);
     end_time = MPI_Wtime();
-
-    sprintf(filename, "particle_file_cpu_n%d_total%lld.par", nprocs, total_particles);
-    parallel_write_to_file(rank_array, length_vector, filename);
+    
+    MPI_Allgather(&length_per_rank, 1, MPI_INT, length_vector, 1, MPI_INT, MPI_COMM_WORLD);
+    if(power < 4){
+        sprintf(filename, "particle_file_cpu_n%d_total%lld.par", nprocs, total_particles); 
+        parallel_write_to_file(rank_array, length_vector, filename);
+    }
 
     if (rank == 0)
         log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, end_time - start_time, "cpu");

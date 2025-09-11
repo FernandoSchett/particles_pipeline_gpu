@@ -6,24 +6,24 @@ GPU_PER_NODE=4
 PARTITION=booster
 TIMES=5
  
-for pp in 8 9 10
+for pp in 8 9
 do
     for ngpu in 1 2 4 6 8 12 16 32 50 64  
     do
         NODES=$(( (ngpu + GPU_PER_NODE - 1) / GPU_PER_NODE ))
-        echo "Submitting GPU job: np=$ngpu, nodes=$NODES, partition=$PARTITION"
+        echo "Submitting GPU job: pp=$pp, np=$ngpu, nodes=$NODES, partition=$PARTITION"
         
         sbatch \
             --nodes=$NODES \
             --ntasks=$ngpu \
             --cpus-per-task=1 \
             --gpus-per-task=1 \
-            --time=00:10:00 \
+            --time=01:00:00 \
             --partition=$PARTITION \
             --account=gsp25 \
-            --job-name=exp_gpu${ngpu} \
-            --output=exp_gpu${ngpu}_%j.out \
-            --error=exp_gpu${ngpu}_%j.err \
+            --job-name=exp_pp${pp}_gpu${ngpu} \
+            --output=exp_pp${pp}_gpu${ngpu}_%j.out \
+            --error=exp_pp${pp}_gpu${ngpu}_%j.err \
             ./run_gpu_experiment.sh box $pp $TIMES $ngpu
     done
 done
