@@ -14,6 +14,7 @@
 #include <boost/sort/spreadsort/integer_sort.hpp>
 
 #include "particle_types.hpp"
+#include "logging.hpp"
 
 extern MPI_Datatype MPI_particle;
 extern int register_MPI_Particle(MPI_Datatype *MPI_Particle);

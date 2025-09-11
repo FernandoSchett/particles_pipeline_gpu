@@ -11,6 +11,8 @@
 #include <limits>
 
 #include "particle_types.hpp"
+#include "logging.hpp"
+
 extern MPI_Datatype MPI_particle;
 
 int parallel_write_to_file(t_particle *particle_array, int *count, char *filename);
