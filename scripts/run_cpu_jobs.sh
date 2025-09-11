@@ -8,6 +8,9 @@ CORES_PER_NODE=48
 PARTITION=batch
 TIMES=5
 
+LOGDIR = "cpu_logdir"
+mkdir -p "$LOGDIR"
+
 for pp in 8 9 
 do
     for np in 1 2 4 6 8 12 16 32 50 64 128 256
@@ -23,8 +26,8 @@ do
             --partition=$PARTITION \
             --account=gsp25 \
             --job-name=exp_pp${pp}_np${np} \
-            --output=exp_pp${pp}_cpu${np}_%j.out \
-            --error=exp_pp${pp}_cpu${np}_%j.err \
+            --output=${LOGDIR}/exp_pp${pp}_cpu${np}_%j.out \
+            --error=${LOGDIR}/exp_pp${pp}_cpu${np}_%j.err \
             ./run_cpu_experiment.sh $np torus $pp $TIMES
     done
 done

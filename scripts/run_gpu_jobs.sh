@@ -5,7 +5,10 @@ cd "$(dirname "$0")"
 GPU_PER_NODE=4 
 PARTITION=booster
 TIMES=5
- 
+
+LOGDIR = "gpu_logdir"
+mkdir -p "$LOGDIR"
+
 for pp in 8 9
 do
     for ngpu in 1 2 4 6 8 12 16 32 50 64  
@@ -22,8 +25,8 @@ do
             --partition=$PARTITION \
             --account=gsp25 \
             --job-name=exp_pp${pp}_gpu${ngpu} \
-            --output=exp_pp${pp}_gpu${ngpu}_%j.out \
-            --error=exp_pp${pp}_gpu${ngpu}_%j.err \
+            --output=${LOGDIR}/exp_pp${pp}_gpu${ngpu}_%j.out \
+            --error=${LOGDIR}/exp_pp${pp}_gpu${ngpu}_%j.err \
             ./run_gpu_experiment.sh torus $pp $TIMES $ngpu
     done
 done
