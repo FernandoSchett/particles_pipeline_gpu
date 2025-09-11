@@ -370,6 +370,6 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
     *particles = newbuf;
     *particle_vector_size = (int)recvbuf.size();
 
-    printf("Rank %d, Number Particles: %d\n", rank, *particle_vector_size);
+    DBG_PRINT("Rank %d, Number Particles: %d\n", rank, *particle_vector_size);
     return 0;
 }

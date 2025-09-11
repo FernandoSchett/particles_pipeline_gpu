@@ -14,7 +14,7 @@
 #include "particles_gpu.hcu"
 #include "file_handling.hpp"
 #include "utils.hpp"
-
+#include "logging.hpp"
 
 #define DEFAULT_POWER 3
 
@@ -42,8 +42,6 @@ void parse_args(int argc, char **argv, int *power, dist_type_t *dist_type)
     }
 }
 
-void distribute_gpu_particles_mpi(t_particle **d_rank_array, int *lens, int *capacity, cudaStream_t stream);
-
 int main(int argc, char **argv)
 {
     MPI_Init(&argc, &argv);
@@ -58,8 +56,7 @@ int main(int argc, char **argv)
     int local_dev = rank % (gpus > 0 ? gpus : 1);
     cudaSetDevice(local_dev);
 
-    if (rank == 0)
-        std::cout << "Using " << nprocs << " GPUs\n";
+    DBG_RANK_PRINT(rank, 0, "Using %d GPUs\n", gpus);
     char filename[128];
 
     int length_per_rank = 0;
@@ -85,7 +82,7 @@ int main(int argc, char **argv)
 
     setup_particles_box_length(power, nprocs, rank, &length_per_rank, &box_length, &total_particles, &RAM_GB, &major_r, &minor_r);
     lens = length_per_rank;
-    printf("Before distribution %d:  %d\n", rank, lens);
+    DBG_PRINT("Before distribution %d:  %d\n", rank, lens);
 
     cudaStreamCreate(&gpu_stream);
 
@@ -113,7 +110,7 @@ int main(int argc, char **argv)
     cudaStreamSynchronize(gpu_stream);
     MPI_Barrier(MPI_COMM_WORLD);
 
-    auto t0 = std::chrono::steady_clock::now();
+    double t0 = MPI_Wtime();
 
     generate_keys_kernel<<<grid, block, 0, gpu_stream>>>(d_rank_array, length_per_rank, box_length);
 
@@ -124,9 +121,8 @@ int main(int argc, char **argv)
 
     cudaStreamSynchronize(gpu_stream);
     MPI_Barrier(MPI_COMM_WORLD);
-
-    auto t1 = std::chrono::steady_clock::now();
-    double dist_sec = std::chrono::duration<double>(t1 - t0).count();
+    double t1 = MPI_Wtime();
+    double dist_sec = t1 - t0;
 
     lens = length_per_rank;
 
@@ -179,7 +175,8 @@ int main(int argc, char **argv)
         if (rank == 0)
         {
             log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, dist_sec, "gpu");
-            if(power < 4){
+            if (power < 4)
+            {
                 sprintf(filename, "particle_file_gpu_n%d_total%lld.par", nprocs, total_particles);
                 std::vector<t_particle *> host_ptrs(nprocs, nullptr);
                 for (int i = 0; i < nprocs; ++i)
@@ -192,7 +189,6 @@ int main(int argc, char **argv)
             }
         }
     }
-
 
     if (d_rank_array)
         cudaFreeAsync(d_rank_array, gpu_stream);

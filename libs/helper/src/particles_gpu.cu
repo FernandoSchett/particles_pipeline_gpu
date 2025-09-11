@@ -330,13 +330,15 @@ void distribute_gpu_particles_mpi(t_particle **d_rank_array, int *lens, int *cap
     cudaStreamSynchronize(stream);
     cudaFreeAsync(d_tmp, stream);
 
-    if (*lens > 0)
-    {
-        const int block = 256;
-        const int grid = (*lens + block - 1) / block;
-        set_rank_kernel<<<grid, block, 0, stream>>>(*d_rank_array, *lens, rank);
-        cudaStreamSynchronize(stream);
-    }
+    DBG_IF({
+        if (*lens > 0)
+        {
+            const int block = 256;
+            const int grid = (*lens + block - 1) / block;
+            set_rank_kernel<<<grid, block, 0, stream>>>(*d_rank_array, *lens, rank);
+            cudaStreamSynchronize(stream);
+        }
+    });
 
-    printf("After disrank %d: %d\n", rank, *lens);
+    DBG_PRINT("After disrank %d: %d\n", rank, *lens);
 }

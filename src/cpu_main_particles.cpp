@@ -13,6 +13,7 @@
 #include "particles_cpu.hpp"
 #include "file_handling.hpp"
 #include "utils.hpp"
+#include "logging.hpp"
 
 #define DEFAULT_POWER 3
 
