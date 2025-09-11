@@ -210,8 +210,18 @@ void distribute_gpu_particles_mpi(t_particle **d_rank_array, int *lens, int *cap
 
     {
         auto pol = thrust::cuda::par.on(stream);
-        thrust::device_ptr<t_particle> first(*d_rank_array), last(*d_rank_array + *lens);
-        thrust::sort(pol, first, last, key_less{});
+        thrust::device_ptr<t_particle> first(*d_rank_array);
+        const int n = *lens;
+        if (n > 1)
+        {
+            auto keys_begin = thrust::make_transform_iterator(
+                first,
+                [] __host__ __device__(const t_particle &p)
+                {
+                    return static_cast<unsigned long long>(p.key);
+                });
+            thrust::sort_by_key(pol, keys_begin, keys_begin + n, first);
+        }
     }
 
     unsigned long long local_min = std::numeric_limits<unsigned long long>::max();
