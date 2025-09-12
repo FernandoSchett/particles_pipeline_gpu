@@ -26,6 +26,7 @@ do
             --ntasks=$ngpu \
             --cpus-per-task=1 \
             --gpus-per-task=1 \
+            --gpu-bind=single:1 \
             --time=05:00:00 \
             --partition=$PARTITION \
             --account=gsp25 \
