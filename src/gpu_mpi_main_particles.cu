@@ -190,6 +190,9 @@ int main(int argc, char **argv)
         }
     }
 
+    if (rank == 0)
+        log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, dist_sec, "gpu");
+
     if (d_rank_array)
         cudaFreeAsync(d_rank_array, gpu_stream);
     if (h_host_array)
