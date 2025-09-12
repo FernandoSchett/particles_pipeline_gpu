@@ -4,7 +4,7 @@ cd "$(dirname "$0")"
 
 GPU_PER_NODE=4 
 PARTITION=booster
-TIMES=5
+TIMES=1
 
 LOGDIR="gpu_logdir"
 
@@ -16,7 +16,7 @@ mkdir -p "$LOGDIR"
 
 for pp in 8 9
 do
-    for ngpu in 1 2 4 6 8 12 16 32 50 64  
+    for ngpu in 1 2 4 6 8
     do
         NODES=$(( (ngpu + GPU_PER_NODE - 1) / GPU_PER_NODE ))
         echo "Submitting GPU job: pp=$pp, np=$ngpu, nodes=$NODES, partition=$PARTITION"
@@ -26,7 +26,6 @@ do
             --ntasks=$ngpu \
             --cpus-per-task=1 \
             --gpus-per-task=1 \
-            --gpu-bind=single:1 \
             --time=05:00:00 \
             --partition=$PARTITION \
             --account=gsp25 \
