@@ -87,7 +87,6 @@ int main(int argc, char **argv)
     cudaStreamCreate(&gpu_stream);
 
     cudaMallocAsync(&d_rank_array, length_per_rank * sizeof(t_particle), gpu_stream);
-    cudaMallocHost(&h_host_array, length_per_rank * sizeof(t_particle));
     capacity = length_per_rank;
 
     cudaDeviceGetAttribute(&sms, cudaDevAttrMultiProcessorCount, local_dev);
@@ -128,6 +127,7 @@ int main(int argc, char **argv)
 
     if (power < 4)
     {
+        cudaMallocHost(&h_host_array, length_per_rank * sizeof(t_particle));
         if (h_host_array)
         {
             cudaFreeHost(h_host_array);
