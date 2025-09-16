@@ -115,9 +115,10 @@ int main(int argc, char **argv)
 
     cudaStreamSynchronize(gpu_stream);
     MPI_Barrier(MPI_COMM_WORLD);
-
-    distribute_gpu_particles_mpi(&d_rank_array, &length_per_rank, &capacity, gpu_stream);
-
+    if (nprocs > 1)
+    {
+        distribute_gpu_particles_mpi(&d_rank_array, &length_per_rank, &capacity, gpu_stream);
+    }
     cudaStreamSynchronize(gpu_stream);
     MPI_Barrier(MPI_COMM_WORLD);
     double t1 = MPI_Wtime();
