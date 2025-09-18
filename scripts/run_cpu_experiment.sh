@@ -10,6 +10,6 @@ echo "Running with $NP processes, $times iterations"
 
 for i in $(seq 1 $times);
 do
-    echo "Execution #$i at $distribuition dist with $NP processes and $power_particles power particles..."
+    echo "Execution #$i at $distribuition dist with $NP processes and $power_particles power particles (SEED: $5)..."
     srun -n $NP ../build/src/p_sfc_exe $distribuition $power_particles
 done

@@ -5,6 +5,7 @@ cd "$(dirname "$0")"
 GPU_PER_NODE=4 
 PARTITION=booster
 TIMES=1
+SEED=69
 
 LOGDIR="gpu_logdir"
 
@@ -32,6 +33,6 @@ do
             --job-name=exp_pp${pp}_gpu${ngpu} \
             --output=${LOGDIR}/exp_pp${pp}_gpu${ngpu}_%j.out \
             --error=${LOGDIR}/exp_pp${pp}_gpu${ngpu}_%j.err \
-            ./run_gpu_experiment.sh torus $pp $TIMES $ngpu
+            ./run_gpu_experiment.sh torus $pp $TIMES $ngpu $SEED
     done
 done

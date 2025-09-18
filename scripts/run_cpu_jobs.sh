@@ -7,6 +7,7 @@ source ./load_modules_cpu.sh
 CORES_PER_NODE=48 
 PARTITION=batch
 TIMES=5
+SEED=69
 
 LOGDIR="cpu_logdir"
 
@@ -33,6 +34,6 @@ do
             --job-name=exp_pp${pp}_np${np} \
             --output=${LOGDIR}/exp_pp${pp}_cpu${np}_%j.out \
             --error=${LOGDIR}/exp_pp${pp}_cpu${np}_%j.err \
-            ./run_cpu_experiment.sh $np torus $pp $TIMES
+            ./run_cpu_experiment.sh $np torus $pp $TIMES $SEED 
     done
 done
