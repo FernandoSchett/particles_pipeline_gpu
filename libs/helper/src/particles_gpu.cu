@@ -210,15 +210,24 @@ struct ExtractKey
     }
 };
 
+static inline void dbg_mem(const char *tag)
+{
+    size_t f, t;
+    cudaMemGetInfo(&f, &t);
+    fprintf(stderr, "[MEM] %s: free=%.2f GB total=%.2f GB\n", tag, f / 1e9, t / 1e9);
+}
+
 void distribute_gpu_particles_mpi(t_particle **d_rank_array, int *lens, int *capacity, cudaStream_t stream)
 {
     int rank, nprocs;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
 
+    dbg_mem("before sort");
     {
-        auto pol = thrust::cuda::par.on(stream);
-        thrust::device_ptr<t_particle> first(*d_rank_array), last(*d_rank_array + *lens);
+        thrust::mr::cuda_memory_resource mr;
+        thrust::mr::allocator<char> alloc(&mr);
+        auto pol = thrust::cuda::par(alloc).on(stream);
         thrust::sort(pol, first, last, key_less{});
     }
 
