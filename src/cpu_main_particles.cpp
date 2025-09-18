@@ -17,9 +17,10 @@
 
 #define DEFAULT_POWER 3
 
-void parse_args(int argc, char **argv, int *power, dist_type_t *dist_type)
+void parse_args(int argc, char **argv, int *power, dist_type_t *dist_type, int *seed)
 {
     *power = DEFAULT_POWER;
+    *seed = DEFAULT_SEED;
     *dist_type = DIST_UNKNOWN;
 
     if (argc > 1)
@@ -39,6 +40,11 @@ void parse_args(int argc, char **argv, int *power, dist_type_t *dist_type)
     {
         *power = atoi(argv[2]);
     }
+
+    if (argc > 3)
+    {
+        *seed = atoi(argv[3]);
+    }
 }
 
 int main(int argc, char **argv)
@@ -49,7 +55,7 @@ int main(int argc, char **argv)
     int *length_vector;
     t_particle *rank_array;
     dist_type_t dist_type;
-    int power;
+    int power, seed;
     double box_length;
     int major_r, minor_r;
     double start_time, end_time;
@@ -63,7 +69,7 @@ int main(int argc, char **argv)
     // You can now use MPI_particle as an input to MPI_Datatype during MPI calls.
     register_MPI_Particle(&MPI_particle);
 
-    parse_args(argc, argv, &power, &dist_type);
+    parse_args(argc, argv, &power, &dist_type, &seed);
     length_vector = (int *)malloc(nprocs * sizeof(int));
 
     setup_particles_box_length(power, nprocs, rank, &length_per_rank, &box_length, &total_particles, &RAM_GB, &major_r, &minor_r);
@@ -75,10 +81,10 @@ int main(int argc, char **argv)
     switch (dist_type)
     {
     case DIST_BOX:
-        box_distribution(&rank_array, length_per_rank, box_length);
+        box_distribution(&rank_array, length_per_rank, box_length, seed + rank);
         break;
     case DIST_TORUS:
-        torus_distribution(&rank_array, length_per_rank, major_r, minor_r, box_length);
+        torus_distribution(&rank_array, length_per_rank, major_r, minor_r, box_length, seed + rank);
         break;
     }
 

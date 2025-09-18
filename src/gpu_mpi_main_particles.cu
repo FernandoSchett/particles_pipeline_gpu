@@ -18,11 +18,11 @@
 
 #define DEFAULT_POWER 3
 
-void parse_args(int argc, char **argv, int *power, dist_type_t *dist_type)
+void parse_args(int argc, char **argv, int *power, dist_type_t *dist_type, int *seed)
 {
     *power = DEFAULT_POWER;
     *dist_type = DIST_UNKNOWN;
-
+    *seed = DEFAULT_SEED;
     if (argc > 1)
     {
         if (std::strcmp(argv[1], "box") == 0)
@@ -39,6 +39,11 @@ void parse_args(int argc, char **argv, int *power, dist_type_t *dist_type)
     if (argc > 2)
     {
         *power = std::atoi(argv[2]);
+    }
+
+    if (argc > 3)
+    {
+        *seed = atoi(argv[3]);
     }
 }
 
