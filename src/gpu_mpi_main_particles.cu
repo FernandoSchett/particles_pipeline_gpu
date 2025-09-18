@@ -22,7 +22,7 @@ void parse_args(int argc, char **argv, int *power, dist_type_t *dist_type, int *
 {
     *power = DEFAULT_POWER;
     *dist_type = DIST_UNKNOWN;
-    *seed = DEFAULT_SEED;
+
     if (argc > 1)
     {
         if (std::strcmp(argv[1], "box") == 0)
@@ -40,7 +40,7 @@ void parse_args(int argc, char **argv, int *power, dist_type_t *dist_type, int *
     {
         *power = std::atoi(argv[2]);
     }
-
+    
     if (argc > 3)
     {
         *seed = atoi(argv[3]);
@@ -72,13 +72,14 @@ int main(int argc, char **argv)
     double box_length = 0.0;
     int major_r = 0;
     int minor_r = 0;
+    int seed; 
     double RAM_GB = 0.0;
     int capacity = 0;
 
     const int block = 256;
     int sms = 0;
 
-    parse_args(argc, argv, &power, &dist_type);
+    parse_args(argc, argv, &power, &dist_type, &seed);
 
     t_particle *d_rank_array = nullptr;
     t_particle *h_host_array = nullptr;
@@ -97,17 +98,16 @@ int main(int argc, char **argv)
     cudaDeviceGetAttribute(&sms, cudaDevAttrMultiProcessorCount, local_dev);
     int maxBlocks = sms * 20;
     int grid = (length_per_rank + block - 1) / block;
-    int seed = rank;
     if (grid > maxBlocks)
         grid = maxBlocks;
 
     switch (dist_type)
     {
     case DIST_BOX:
-        box_distribution_kernel<<<grid, block, 0, gpu_stream>>>(d_rank_array, length_per_rank, box_length, seed);
+        box_distribution_kernel<<<grid, block, 0, gpu_stream>>>(d_rank_array, length_per_rank, box_length, seed + rank);
         break;
     case DIST_TORUS:
-        torus_distribution_kernel<<<grid, block, 0, gpu_stream>>>(d_rank_array, length_per_rank, major_r, minor_r, box_length, seed);
+        torus_distribution_kernel<<<grid, block, 0, gpu_stream>>>(d_rank_array, length_per_rank, major_r, minor_r, box_length, seed + rank);
         break;
     }
 

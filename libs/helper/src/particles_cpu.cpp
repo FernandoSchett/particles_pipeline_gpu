@@ -17,14 +17,14 @@ int register_MPI_Particle(MPI_Datatype *MPI_Particle)
     for (int i = 0; i < NPROPS_PARTICLE; i++)
         displacements[i] = address[i + 1] - address[0];
 
-    MPI_Datatype tmp;
+    MPI_Datatype tmp; // <- tipo intermediário
     MPI_Type_create_struct(NPROPS_PARTICLE, blocklengths, displacements, array_types, &tmp);
 
     MPI_Get_address(&dummy_particle[1], &extent_add);
     extent_add = extent_add - address[0];
 
     MPI_Type_create_resized(tmp, 0, extent_add, MPI_Particle);
-    MPI_Type_free(&tmp);
+    MPI_Type_free(&tmp); // <- libera o intermediário
 
     MPI_Type_size(*MPI_Particle, &type_size);
     MPI_Type_commit(MPI_Particle);
@@ -50,12 +50,14 @@ int allocate_particle(t_particle **particle_array, int count)
 
 int box_distribution(t_particle **particle_array, int count, double box_length, int seed)
 {
+    int p_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &p_rank);
 
     typedef r123::Philox4x32 RNG;
     RNG rng;
     RNG::ctr_type c = {{}};
     RNG::ukey_type uk = {{}};
-    uk[0] = seed; // some user_supplied_seed
+    uk[0] = p_rank; // some user_supplied_seed
     RNG::key_type k = uk;
     RNG::ctr_type r;
 
@@ -84,14 +86,17 @@ int box_distribution(t_particle **particle_array, int count, double box_length, 
 
 int torus_distribution(t_particle **particle_array, int count, double major_r, double minor_r, double box_length, int seed)
 {
+    int p_rank;
     double theta, phi, r;
     double center = box_length / 2.0;
+
+    MPI_Comm_rank(MPI_COMM_WORLD, &p_rank);
 
     typedef r123::Philox4x32 RNG;
     RNG rng;
     RNG::ctr_type c = {{}};
     RNG::ukey_type uk = {{}};
-    uk[0] = seed;
+    uk[0] = p_rank;
     RNG::key_type k = uk;
     RNG::ctr_type rnum;
 
@@ -318,7 +323,7 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
     {
         if (nprocs == 1)
         {
-            std::memcpy(sendbuf.data(), *particles, local_n * sizeof(t_particle));
+            memcpy(sendbuf.data(), *particles, local_n * sizeof(t_particle));
         }
         else
         {
@@ -341,7 +346,7 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
                 int amt = end - begin;
                 if (amt > 0)
                 {
-                    std::memcpy(sendbuf.data() + sdispls[b],
+                    memcpy(sendbuf.data() + sdispls[b],
                                 *particles + begin,
                                 amt * sizeof(t_particle));
                 }
@@ -359,7 +364,7 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
 
     free(*particles);
     t_particle *newbuf = (t_particle *)malloc(recvbuf.size() * sizeof(t_particle));
-    std::memcpy(newbuf, recvbuf.data(), recvbuf.size() * sizeof(t_particle));
+    memcpy(newbuf, recvbuf.data(), recvbuf.size() * sizeof(t_particle));
     *particles = newbuf;
     *particle_vector_size = (int)recvbuf.size();
 

@@ -6,8 +6,19 @@
 #include <algorithm>
 #include <limits>
 #include <cmath>
+#include <mpi.h>
+
+#include <Random123/philox.h>
+#include <Random123/uniform.hpp>
+#include <string.h>
+
+#include <boost/sort/spreadsort/integer_sort.hpp>
 
 #include "particle_types.hpp"
+#include "logging.hpp"
+
+extern MPI_Datatype MPI_particle;
+int register_MPI_Particle(MPI_Datatype *MPI_Particle);
 
 int box_distribution(t_particle **particle_array, int count, double box_length, int seed);
 int torus_distribution(t_particle **particle_array, int count, double major_r, double minor_r, double box_length, int seed);
