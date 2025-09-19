@@ -180,7 +180,6 @@ int main(int argc, char **argv)
 
         if (rank == 0)
         {
-            log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, dist_sec, "gpu");
             if (power < 4)
             {
                 sprintf(filename, "particle_file_gpu_n%d_total%lld.par", nprocs, total_particles);
@@ -197,7 +196,7 @@ int main(int argc, char **argv)
     }
 
     if (rank == 0)
-        log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, dist_sec, "gpu");
+        log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, dist_sec, "gpu", seed);
 
     if (d_rank_array)
         cudaFreeAsync(d_rank_array, gpu_stream);

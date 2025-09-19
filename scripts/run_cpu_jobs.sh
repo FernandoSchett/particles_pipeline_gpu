@@ -17,9 +17,9 @@ fi
 
 mkdir -p "$LOGDIR"
 
-for pp in 8 9 
+for pp in 8 
 do
-    for np in 1 2 4 6 8 12 16 32 50 64 128 256
+    for np in 1 2 4 6 8 16 24 32 50 64 128 256
     do
         NODES=$(( (np + CORES_PER_NODE - 1) / CORES_PER_NODE ))
         echo "Submitting CPU job: pp${pp}, np=$np, nodes=$NODES, partition=$PARTITION"

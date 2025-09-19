@@ -112,7 +112,7 @@ int main(int argc, char **argv)
     }
 
     if (rank == 0)
-        log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, end_time - start_time, "cpu");
+        log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, end_time - start_time, "cpu", seed);
 
     total_length = 0;
     for (int i = 0; i < nprocs; i++)

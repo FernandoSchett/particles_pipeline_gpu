@@ -48,7 +48,7 @@ void setup_particles_box_length(int power, int nprocs, int rank, int *length_per
 
 
 
-void log_results(int rank, int power, long long total_particles, int length_per_rank, int nprocs, double box_length, double RAM_GB, double execution_time, const char *device_type)
+void log_results(int rank, int power, long long total_particles, int length_per_rank, int nprocs, double box_length, double RAM_GB, double execution_time, const char *device_type, int seed)
 {
 	time_t rawtime;
 	std::tm *timeinfo;
@@ -59,21 +59,21 @@ void log_results(int rank, int power, long long total_particles, int length_per_
 	std::strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", timeinfo);
 
 	struct stat buffer;
-	const char *results_path = "../../results.csv";
+	const char *results_path = "../results.csv";
 	const int file_exists = (stat(results_path, &buffer) == 0);
 
 	FILE *f = std::fopen(results_path, "a");
 	if (!file_exists)
 	{
-		std::fprintf(f, "datetime,power,total_particles,length_per_rank,num_procs,box_length,RAM_GB,execution_time,device\n");
+		std::fprintf(f, "datetime,power,total_particles,length_per_rank,num_procs,box_length,RAM_GB,execution_time,device,seed\n");
 	}
 
-	std::fprintf(f, "%s,%d,%lld,%d,%d,%.1f,%.2f,%f,%s\n",
+	std::fprintf(f, "%s,%d,%lld,%d,%d,%.1f,%.2f,%f,%s,%d\n",
 				 time_str, power, total_particles, length_per_rank, nprocs,
-				 box_length, RAM_GB, execution_time, device_type);
-	std::printf("%s,%d,%lld,%d,%d,%.1f,%.2f,%f,%s\n",
+				 box_length, RAM_GB, execution_time, device_type, seed);
+	std::printf("%s,%d,%lld,%d,%d,%.1f,%.2f,%f,%s,%d\n",
 				time_str, power, total_particles, length_per_rank, nprocs,
-				box_length, RAM_GB, execution_time, device_type);
+				box_length, RAM_GB, execution_time, device_type, seed);
 
 	std::fclose(f);
 }

@@ -15,9 +15,9 @@ fi
 
 mkdir -p "$LOGDIR"
 
-for pp in 9
+for pp in 8
 do
-    for ngpu in 1 2 8 
+    for ngpu in 1 2 4 6 8 16 24 32 50 64 128
     do
         NODES=$(( (ngpu + GPU_PER_NODE - 1) / GPU_PER_NODE ))
         echo "Submitting GPU job: pp=$pp, np=$ngpu, nodes=$NODES, partition=$PARTITION"

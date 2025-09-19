@@ -15,7 +15,7 @@ void print_particles(t_particle *particle_array, int size, int rank);
 
 void setup_particles_box_length(int power, int nprocs, int rank, int *length_per_rank, double *box_length, long long *total_particles, double *RAM_GB, int *major_r, int *minor_r);
 
-void log_results(int rank, int power, long long total_particles, int length_per_rank, int nprocs, double box_length, double RAM_GB, double execution_time, const char *device_type);
+void log_results(int rank, int power, long long total_particles, int length_per_rank, int nprocs, double box_length, double RAM_GB, double execution_time, const char *device_type, int seed);
 
 static inline bool key_less(const t_particle &a, const t_particle &b);
 
