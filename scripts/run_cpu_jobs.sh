@@ -9,7 +9,7 @@ PARTITION=batch
 TIMES=5
 SEED=69
 
-LOGDIR="cpu_logdir"
+LOGDIR="cpu_logdir__$5"
 
 if [ -d "$LOGDIR" ]; then
   rm -rf "$LOGDIR"
@@ -31,9 +31,9 @@ do
             --time=05:00:00 \
             --partition=$PARTITION \
             --account=gsp25 \
-            --job-name=exp_pp${pp}_np${np} \
-            --output=${LOGDIR}/exp_pp${pp}_cpu${np}_%j.out \
-            --error=${LOGDIR}/exp_pp${pp}_cpu${np}_%j.err \
+            --job-name=exp_pp${pp}_np${np}_seed${SEED} \
+            --output=${LOGDIR}/exp_pp${pp}_cpu${np}_seed${SEED}%j.out \
+            --error=${LOGDIR}/exp_pp${pp}_cpu${np}_seed${SEED}%j.err \
             ./run_cpu_experiment.sh $np torus $pp $TIMES $SEED 
     done
 done

@@ -7,7 +7,7 @@ PARTITION=booster
 TIMES=1
 SEED=69
 
-LOGDIR="gpu_logdir"
+LOGDIR="gpu_logdir_$5"
 
 if [ -d "$LOGDIR" ]; then
   rm -rf "$LOGDIR"
@@ -30,9 +30,9 @@ do
             --time=05:00:00 \
             --partition=$PARTITION \
             --account=gsp25 \
-            --job-name=exp_pp${pp}_gpu${ngpu} \
-            --output=${LOGDIR}/exp_pp${pp}_gpu${ngpu}_%j.out \
-            --error=${LOGDIR}/exp_pp${pp}_gpu${ngpu}_%j.err \
+            --job-name=exp_pp${pp}_gpu${ngpu}_seed${SEED} \
+            --output=${LOGDIR}/exp_pp${pp}_gpu${ngpu}_seed${SEED}%j.out \
+            --error=${LOGDIR}/exp_pp${pp}_gpu${ngpu}_seed${SEED}%j.err \
             ./run_gpu_experiment.sh torus $pp $TIMES $ngpu $SEED
     done
 done
