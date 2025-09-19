@@ -114,12 +114,13 @@ int main(int argc, char **argv)
     cudaStreamSynchronize(gpu_stream);
     MPI_Barrier(MPI_COMM_WORLD);
 
+    double t05 = 0;
     double t0 = MPI_Wtime();
-
     generate_keys_kernel<<<grid, block, 0, gpu_stream>>>(d_rank_array, length_per_rank, box_length);
 
     cudaStreamSynchronize(gpu_stream);
     MPI_Barrier(MPI_COMM_WORLD);
+    t05 = MPI_Wtime();
     if (nprocs > 1)
     {
         distribute_gpu_particles_mpi(&d_rank_array, &length_per_rank, &capacity, gpu_stream);
@@ -127,7 +128,8 @@ int main(int argc, char **argv)
     cudaStreamSynchronize(gpu_stream);
     MPI_Barrier(MPI_COMM_WORLD);
     double t1 = MPI_Wtime();
-    double dist_sec = t1 - t0;
+    double gen_time = t05 - t0;
+    double dist_time = t1 - t05;
 
     lens = length_per_rank;
 
@@ -196,7 +198,7 @@ int main(int argc, char **argv)
     }
 
     if (rank == 0)
-        log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, dist_sec, "gpu", seed);
+        log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, gen_time, dist_time, "gpu", seed);
 
     if (d_rank_array)
         cudaFreeAsync(d_rank_array, gpu_stream);

@@ -58,7 +58,7 @@ int main(int argc, char **argv)
     int power, seed;
     double box_length;
     int major_r, minor_r;
-    double start_time, end_time;
+    double start_time, end_time, mid_time;
     char filename[128];
     double RAM_GB;
 
@@ -92,6 +92,10 @@ int main(int argc, char **argv)
     start_time = MPI_Wtime();
 
     generate_particles_keys(rank_array, length_per_rank, box_length);
+    
+    MPI_Barrier(MPI_COMM_WORLD);
+    mid_time = MPI_Wtime();
+    
     distribute_particles(&rank_array, &length_per_rank, nprocs);
 
     // if(rank == 0){
@@ -112,7 +116,7 @@ int main(int argc, char **argv)
     }
 
     if (rank == 0)
-        log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, end_time - start_time, "cpu", seed);
+        log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, mid_time - start_time, end_time - mid_time, "cpu", seed);
 
     total_length = 0;
     for (int i = 0; i < nprocs; i++)

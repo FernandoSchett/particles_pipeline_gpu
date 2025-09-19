@@ -7,7 +7,7 @@ PARTITION=booster
 TIMES=1
 SEED=69
 
-LOGDIR="gpu_logdir_$5"
+LOGDIR="gpu_logdir_$SEED"
 
 if [ -d "$LOGDIR" ]; then
   rm -rf "$LOGDIR"
@@ -15,9 +15,9 @@ fi
 
 mkdir -p "$LOGDIR"
 
-for pp in 8
+for pp in 9
 do
-    for ngpu in 1 2 4 6 8 16 24 32 50 64 128
+    for ngpu in 1 2 4
     do
         NODES=$(( (ngpu + GPU_PER_NODE - 1) / GPU_PER_NODE ))
         echo "Submitting GPU job: pp=$pp, np=$ngpu, nodes=$NODES, partition=$PARTITION"
