@@ -8,3 +8,4 @@ scripts/*.par
 scripts/*_logdir/
 scripts/*jwc
 scripts/core.jwb*.juwels.*
+results/
