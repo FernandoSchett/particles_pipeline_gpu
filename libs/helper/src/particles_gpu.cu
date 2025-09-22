@@ -281,6 +281,7 @@ void discover_splitters_gpu(const t_particle *d_rank_array, int lens, cudaStream
         lo_base = lo;
     }
 }
+
 void redistribute_by_splitters_gpu(t_particle **d_rank_array, int *lens, int *capacity,
                                    const std::vector<unsigned long long> &splitters, cudaStream_t stream)
 {

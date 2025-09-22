@@ -67,6 +67,7 @@ int box_distribution(t_particle **particle_array, int count, double box_length, 
         (*particle_array)[i].coord[2] = uz * box_length;
     }
     return 0;
+     }
 
 int torus_distribution(t_particle **particle_array, int count, double major_r, double minor_r, double box_length, int seed)
 {
