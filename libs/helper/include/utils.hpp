@@ -15,7 +15,7 @@ void print_particles(t_particle *particle_array, int size, int rank);
 
 void setup_particles_box_length(ExecConfig &cfg);
 
-void log_results(const ExecConfig &cfg, double gen_time, double dist_time, const char *results_path);
+void log_results(const ExecConfig &cfg, const exec_times &times, const char *results_path);
 
 static inline bool key_less(const t_particle &a, const t_particle &b);
 

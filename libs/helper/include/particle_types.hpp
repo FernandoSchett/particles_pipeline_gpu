@@ -50,6 +50,14 @@ typedef struct
   double ram_gb;
 } ExecConfig;
 
+typedef struct
+{
+  double gen_time;
+  double splitters_time;
+  double dist_time;
+  double total_time;
+} exec_times;
+
 #define NPROPS_PARTICLE 3
 #define MAX_DEPTH 15
 #define DEFAULT_SEED 24

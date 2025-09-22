@@ -35,7 +35,7 @@ void setup_particles_box_length(ExecConfig &cfg)
     cfg.total_particles = base;
     cfg.box_length = std::pow(10.0, cfg.power);
     cfg.length_per_rank = static_cast<int>((static_cast<long long>(cfg.rank + 1) * slice) +
-                                            ((cfg.rank == cfg.nprocs - 1) ? rem : 0));
+                                           ((cfg.rank == cfg.nprocs - 1) ? rem : 0));
     cfg.major_r = static_cast<int>(4 * std::pow(10.0, cfg.power - 1));
     cfg.minor_r = static_cast<int>(2 * std::pow(10.0, cfg.power - 1));
     cfg.ram_gb = (cfg.length_per_rank * 40.0) / 1e9;
@@ -48,7 +48,15 @@ void setup_particles_box_length(ExecConfig &cfg)
     }
 }
 
-void log_results(const ExecConfig &cfg, double gen_time, double dist_time, const char *results_path)
+typedef struct
+{
+    double gen_time;
+    double splitters_time;
+    double dist_time;
+    double total_time;
+} exec_times;
+
+void log_results(const ExecConfig &cfg, const exec_times &times, const char *results_path)
 {
     time_t rawtime;
     std::tm *ti;
@@ -56,16 +64,24 @@ void log_results(const ExecConfig &cfg, double gen_time, double dist_time, const
     std::time(&rawtime);
     ti = std::localtime(&rawtime);
     std::strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S", ti);
+
     struct stat buffer;
     const int exists = (stat(results_path, &buffer) == 0);
     FILE *f = std::fopen(results_path, "a");
     if (!exists)
-        std::fprintf(f, "datetime,power,total_particles,length_per_rank,num_procs,box_length,RAM_GB,gen_time,dist_time,device,seed,mode\n");
+        std::fprintf(f, "datetime,power,total_particles,length_per_rank,num_procs,box_length,RAM_GB,gen_time,splitters_time,dist_time,total_time,device,seed,mode\n");
+
     const char *mode_str = (cfg.exp_type == WEAK_SCALING) ? "weak" : "strong";
-    std::fprintf(f, "%s,%d,%lld,%d,%d,%.1f,%.2f,%f,%f,%s,%d,%s\n",
+
+    std::fprintf(f, "%s,%d,%lld,%d,%d,%.1f,%.2f,%f,%f,%f,%f,%s,%d,%s\n",
                  ts, cfg.power, cfg.total_particles, cfg.length_per_rank, cfg.nprocs,
-                 cfg.box_length, cfg.ram_gb, gen_time, dist_time, cfg.device, cfg.seed, mode_str);
-    std::printf("%s,%d,%lld,%d,%d,%.1f,%.2f,%f,%f,%s,%d,%s\n",
+                 cfg.box_length, cfg.ram_gb,
+                 times.gen_time, times.splitters_time, times.dist_time, times.total_time,
+                 cfg.device, cfg.seed, mode_str);
+
+    std::printf("%s,%d,%lld,%d,%d,%.1f,%.2f,%f,%f,%f,%f,%s,%d,%s\n",
                 ts, cfg.power, cfg.total_particles, cfg.length_per_rank, cfg.nprocs,
-                cfg.box_length, cfg.ram_gb, gen_time, dist_time, cfg.device, cfg.seed, mode_str);
+                cfg.box_length, cfg.ram_gb,
+                times.gen_time, times.splitters_time, times.dist_time, times.total_time,
+                cfg.device, cfg.seed, mode_str);
 }

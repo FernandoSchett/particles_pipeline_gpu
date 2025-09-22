@@ -49,11 +49,14 @@ int main(int argc, char **argv)
 {
     MPI_Init(&argc, &argv);
     ExecConfig cfg;
+    exec_times times = {0.0, 0.0, 0.0, 0.0};
+
     MPI_Comm_rank(MPI_COMM_WORLD, &cfg.rank);
     MPI_Comm_size(MPI_COMM_WORLD, &cfg.nprocs);
     cfg.device = "cpu";
     parse_args(argc, argv, cfg);
 
+    std::vector<unsigned long long> splitters;
     register_MPI_Particle(&MPI_particle);
     int *length_vector = (int *)std::malloc(cfg.nprocs * sizeof(int));
     t_particle *rank_array = nullptr;
@@ -76,14 +79,20 @@ int main(int argc, char **argv)
 
     MPI_Barrier(MPI_COMM_WORLD);
     double t0 = MPI_Wtime();
+
     generate_particles_keys(rank_array, cfg.length_per_rank, cfg.box_length);
-    MPI_Barrier(MPI_COMM_WORLD);
-    double t05 = MPI_Wtime();
-    std::vector<unsigned long long> splitters;
-    discover_splitters_cpu(rank_array, cfg.length_per_rank, splitters);
-    redistribute_by_splitters_cpu(&rank_array, &cfg.length_per_rank, splitters);
+
     MPI_Barrier(MPI_COMM_WORLD);
     double t1 = MPI_Wtime();
+
+    discover_splitters_cpu(rank_array, cfg.length_per_rank, splitters);
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    double t2 = MPI_Wtime();
+
+    redistribute_by_splitters_cpu(&rank_array, &cfg.length_per_rank, splitters);
+    MPI_Barrier(MPI_COMM_WORLD);
+    double t3 = MPI_Wtime();
 
     if (cfg.power < 4)
     {
@@ -95,9 +104,14 @@ int main(int argc, char **argv)
 
     if (cfg.rank == 0)
     {
+        times.gen_time = t1 - t0;
+        times.splitters_time = t2 - t1;
+        times.dist_time = t3 - t2;
+        times.total_time = t3 - t0;
+
         const char *mode_str = (cfg.exp_type == WEAK_SCALING) ? "weak" : "strong";
         std::string out = std::string("../results_") + mode_str + ".csv";
-        log_results(cfg, t05 - t0, t1 - t05, out.c_str());
+        log_results(cfg, times, out.c_str());
     }
 
     std::free(rank_array);
