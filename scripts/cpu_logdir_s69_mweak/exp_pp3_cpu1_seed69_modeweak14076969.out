@@ -1,0 +1,16 @@
+Running with 1 processes, 5 iterations
+Execution #1 at torus dist with 1 processes and 3 power particles weak mode (SEED: 69)...
+WEAK scaling: 1000 particles distributed like (rank_number*1000) between 1 processes in a 1000.0 sized box using 0.0000 GBs.
+2025-09-22 14:50:33,3,1000,1000,1,1000.0,0.00,0.006175,0.000139,cpu,69,weak
+Execution #2 at torus dist with 1 processes and 3 power particles weak mode (SEED: 69)...
+WEAK scaling: 1000 particles distributed like (rank_number*1000) between 1 processes in a 1000.0 sized box using 0.0000 GBs.
+2025-09-22 14:50:35,3,1000,1000,1,1000.0,0.00,0.006153,0.000139,cpu,69,weak
+Execution #3 at torus dist with 1 processes and 3 power particles weak mode (SEED: 69)...
+WEAK scaling: 1000 particles distributed like (rank_number*1000) between 1 processes in a 1000.0 sized box using 0.0000 GBs.
+2025-09-22 14:50:36,3,1000,1000,1,1000.0,0.00,0.006155,0.000134,cpu,69,weak
+Execution #4 at torus dist with 1 processes and 3 power particles weak mode (SEED: 69)...
+WEAK scaling: 1000 particles distributed like (rank_number*1000) between 1 processes in a 1000.0 sized box using 0.0000 GBs.
+2025-09-22 14:50:38,3,1000,1000,1,1000.0,0.00,0.006144,0.000133,cpu,69,weak
+Execution #5 at torus dist with 1 processes and 3 power particles weak mode (SEED: 69)...
+WEAK scaling: 1000 particles distributed like (rank_number*1000) between 1 processes in a 1000.0 sized box using 0.0000 GBs.
+2025-09-22 14:50:39,3,1000,1000,1,1000.0,0.00,0.006140,0.000137,cpu,69,weak

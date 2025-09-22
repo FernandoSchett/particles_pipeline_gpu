@@ -18,32 +18,39 @@
 
 #define DEFAULT_POWER 3
 
-void parse_args(int argc, char **argv, int *power, dist_type_t *dist_type, int *seed)
+void parse_args(int argc, char **argv,
+                int *power, dist_type_t *dist_type,
+                int *seed, exp_type_t *exp_type)
 {
     *power = DEFAULT_POWER;
+    *seed = DEFAULT_SEED;
     *dist_type = DIST_UNKNOWN;
+    *exp_type = STRONG_SCALING;
+
 
     if (argc > 1)
     {
-        if (std::strcmp(argv[1], "box") == 0)
+        if (strcmp(argv[1], "box") == 0)
             *dist_type = DIST_BOX;
-        else if (std::strcmp(argv[1], "torus") == 0)
+        else if (strcmp(argv[1], "torus") == 0)
             *dist_type = DIST_TORUS;
     }
 
     if (*dist_type == DIST_UNKNOWN)
-    {
         *dist_type = DIST_BOX;
-    }
 
     if (argc > 2)
-    {
-        *power = std::atoi(argv[2]);
-    }
-    
+        *power = atoi(argv[2]);
+
     if (argc > 3)
-    {
         *seed = atoi(argv[3]);
+
+    if (argc > 4)
+    {
+        if (strcmp(argv[4], "weak") == 0)
+            *exp_type = WEAK_SCALING;
+        else if (strcmp(argv[4], "strong") == 0)
+            *exp_type = STRONG_SCALING;
     }
 }
 
@@ -53,6 +60,8 @@ int main(int argc, char **argv)
 
     int rank = 0;
     int nprocs = 1;
+    exp_type_t exp_type;
+    
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
 
@@ -79,14 +88,14 @@ int main(int argc, char **argv)
     const int block = 256;
     int sms = 0;
 
-    parse_args(argc, argv, &power, &dist_type, &seed);
+    parse_args(argc, argv, &power, &dist_type, &seed, &exp_type);
 
     t_particle *d_rank_array = nullptr;
     t_particle *h_host_array = nullptr;
     cudaStream_t gpu_stream;
     int lens = 0;
 
-    setup_particles_box_length(power, nprocs, rank, &length_per_rank, &box_length, &total_particles, &RAM_GB, &major_r, &minor_r);
+    setup_particles_box_length(power, nprocs, rank, &length_per_rank, &box_length, &total_particles, &RAM_GB, &major_r, &minor_r, exp_type);
     lens = length_per_rank;
     DBG_PRINT("Before distribution %d:  %d\n", rank, lens);
 
@@ -198,7 +207,7 @@ int main(int argc, char **argv)
     }
 
     if (rank == 0)
-        log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, gen_time, dist_time, "gpu", seed);
+        log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, gen_time, dist_time, "gpu", seed, exp_type);
 
     if (d_rank_array)
         cudaFreeAsync(d_rank_array, gpu_stream);

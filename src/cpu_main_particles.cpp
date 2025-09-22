@@ -17,11 +17,15 @@
 
 #define DEFAULT_POWER 3
 
-void parse_args(int argc, char **argv, int *power, dist_type_t *dist_type, int *seed)
+void parse_args(int argc, char **argv,
+                int *power, dist_type_t *dist_type,
+                int *seed, exp_type_t *exp_type)
 {
     *power = DEFAULT_POWER;
     *seed = DEFAULT_SEED;
     *dist_type = DIST_UNKNOWN;
+    *exp_type = STRONG_SCALING;
+
 
     if (argc > 1)
     {
@@ -32,18 +36,20 @@ void parse_args(int argc, char **argv, int *power, dist_type_t *dist_type, int *
     }
 
     if (*dist_type == DIST_UNKNOWN)
-    {
         *dist_type = DIST_BOX;
-    }
 
     if (argc > 2)
-    {
         *power = atoi(argv[2]);
-    }
 
     if (argc > 3)
-    {
         *seed = atoi(argv[3]);
+
+    if (argc > 4)
+    {
+        if (strcmp(argv[4], "weak") == 0)
+            *exp_type = WEAK_SCALING;
+        else if (strcmp(argv[4], "strong") == 0)
+            *exp_type = STRONG_SCALING;
     }
 }
 
@@ -61,6 +67,7 @@ int main(int argc, char **argv)
     double start_time, end_time, mid_time;
     char filename[128];
     double RAM_GB;
+    exp_type_t exp_type;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
@@ -69,10 +76,10 @@ int main(int argc, char **argv)
     // You can now use MPI_particle as an input to MPI_Datatype during MPI calls.
     register_MPI_Particle(&MPI_particle);
 
-    parse_args(argc, argv, &power, &dist_type, &seed);
+    parse_args(argc, argv, &power, &dist_type, &seed, &exp_type);
     length_vector = (int *)malloc(nprocs * sizeof(int));
 
-    setup_particles_box_length(power, nprocs, rank, &length_per_rank, &box_length, &total_particles, &RAM_GB, &major_r, &minor_r);
+    setup_particles_box_length(power, nprocs, rank, &length_per_rank, &box_length, &total_particles, &RAM_GB, &major_r, &minor_r, exp_type);
 
     // Everybody need to know howm much much particles each other have.
     MPI_Allgather(&length_per_rank, 1, MPI_INT, length_vector, 1, MPI_INT, MPI_COMM_WORLD);
@@ -116,7 +123,7 @@ int main(int argc, char **argv)
     }
 
     if (rank == 0)
-        log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, mid_time - start_time, end_time - mid_time, "cpu", seed);
+        log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, mid_time - start_time, end_time - mid_time, "cpu", seed, exp_type);
 
     total_length = 0;
     for (int i = 0; i < nprocs; i++)

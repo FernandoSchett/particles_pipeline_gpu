@@ -25,29 +25,42 @@ void print_particles(t_particle *particle_array, int size, int rank)
     }
 }
 
-void setup_particles_box_length(int power, int nprocs, int rank, int *length_per_rank, double *box_length, long long *total_particles, double *RAM_GB, int *major_r, int *minor_r)
+void setup_particles_box_length(int power, int nprocs, int rank,
+                                int *length_per_rank, double *box_length,
+                                long long *total_particles, double *RAM_GB,
+                                int *major_r, int *minor_r,
+                                exp_type_t exp_type)
 {
     const long long base = static_cast<long long>(std::pow(10.0, power));
+
+    if (exp_type == WEAK_SCALING)
+        *total_particles = base * nprocs;
+    else
+        *total_particles = base;
+
     const long long T = static_cast<long long>(nprocs) * (nprocs + 1) / 2;
     const long long slice = base / T;
     const long long rem = base - slice * T;
 
-    *total_particles = base;
     *box_length = std::pow(10.0, power);
-    *length_per_rank = static_cast<int>((static_cast<long long>(rank + 1) * slice) + ((rank == nprocs - 1) ? rem : 0));
+    *length_per_rank = static_cast<int>((static_cast<long long>(rank + 1) * slice) +
+                                        ((rank == nprocs - 1) ? rem : 0));
     *major_r = static_cast<int>(4 * std::pow(10.0, power - 1));
     *minor_r = static_cast<int>(2 * std::pow(10.0, power - 1));
     *RAM_GB = (*total_particles * 40.0) / 1e9;
 
     if (rank == 0)
     {
-        std::printf("%lld particles distributed like (rank_number*%lld) between %d processes in a %.1f sized box using %.4f GBs.\n",
+        std::printf("%s scaling: %lld particles distributed like (rank_number*%lld) "
+                    "between %d processes in a %.1f sized box using %.4f GBs.\n",
+                    (exp_type == WEAK_SCALING ? "WEAK" : "STRONG"),
                     *total_particles, slice, nprocs, *box_length, *RAM_GB);
     }
 }
 
 
-void log_results(int rank, int power, long long total_particles, int length_per_rank, int nprocs, double box_length, double RAM_GB, double gen_time, double dist_time, const char *device_type, int seed)
+
+void log_results(int rank, int power, long long total_particles, int length_per_rank, int nprocs, double box_length, double RAM_GB, double gen_time, double dist_time, const char *device_type, int seed, exp_type_t exp_type)
 {
 	time_t rawtime;
 	std::tm *timeinfo;
@@ -64,16 +77,18 @@ void log_results(int rank, int power, long long total_particles, int length_per_
 	FILE *f = std::fopen(results_path, "a");
 	if (!file_exists)
 	{
-		std::fprintf(f, "datetime,power,total_particles,length_per_rank,num_procs,box_length,RAM_GB,gen_time,dist_time,device,seed\n");
+		std::fprintf(f, "datetime,power,total_particles,length_per_rank,num_procs,box_length,RAM_GB,gen_time,dist_time,device,seed,mode\n");
 	}
 
-	std::fprintf(f, "%s,%d,%lld,%d,%d,%.1f,%.2f,%f,%f,%s,%d\n",
+	const char *mode_str = (exp_type == WEAK_SCALING) ? "weak" : "strong";
+
+	std::fprintf(f, "%s,%d,%lld,%d,%d,%.1f,%.2f,%f,%f,%s,%d,%s\n",
 				 time_str, power, total_particles, length_per_rank, nprocs,
-				 box_length, RAM_GB, gen_time, dist_time, device_type, seed);
-	std::printf("%s,%d,%lld,%d,%d,%.1f,%.2f,%f,%f,%s,%d\n",
+				 box_length, RAM_GB, gen_time, dist_time, device_type, seed, mode_str);
+
+	std::printf("%s,%d,%lld,%d,%d,%.1f,%.2f,%f,%f,%s,%d,%s\n",
 				time_str, power, total_particles, length_per_rank, nprocs,
-				box_length, RAM_GB, gen_time, dist_time, device_type, seed);
+				box_length, RAM_GB, gen_time, dist_time, device_type, seed, mode_str);
 
 	std::fclose(f);
 }
-

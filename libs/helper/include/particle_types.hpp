@@ -27,6 +27,12 @@ typedef enum
   DIST_UNKNOWN
 } dist_type_t;
 
+typedef enum
+{
+  WEAK_SCALING,
+  STRONG_SCALING,
+} exp_type_t;
+
 #define NPROPS_PARTICLE 3
 #define MAX_DEPTH 15
 #define DEFAULT_SEED 24

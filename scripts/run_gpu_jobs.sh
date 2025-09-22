@@ -40,7 +40,7 @@ do
                 --time=05:00:00 \
                 --partition=$PARTITION \
                 --account=gsp25 \
-                --job-name=exp_pp${pp}_gpu${ngpu}_seed${SEED} \
+                --job-name=exp_pp${pp}_gpu${ngpu}_seed${SEED}_mode${mode} \
                 --output=${LOGDIR}/exp_pp${pp}_gpu${ngpu}_seed${SEED}_m${mode}%j.out \
                 --error=${LOGDIR}/exp_pp${pp}_gpu${ngpu}_seed${SEED}_m${mode}%j.err \
                 ./run_gpu_experiment.sh torus $pp $TIMES $ngpu $SEED $mode
