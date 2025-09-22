@@ -1,6 +1,5 @@
 build/
 .vscode/
-*.png
 scripts/*.out
 *.par
 scripts/*.par
