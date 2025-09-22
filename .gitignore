@@ -1,11 +1,9 @@
 build/
 .vscode/
 *.png
-.ipynb_checkpoints
 scripts/*.out
 *.par
 scripts/*.par
 scripts/*_logdir/
 scripts/*jwc
 scripts/core.jwb*.juwels.*
-results/
