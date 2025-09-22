@@ -6,11 +6,10 @@
 #include <Random123/uniform.hpp>
 #include <cuda_runtime_api.h>
 
-
-#include <mpi.h>         
+#include <mpi.h>
 #include <thrust/system/cuda/execution_policy.h>
 #include <thrust/binary_search.h>
-#include <thrust/device_ptr.h>  
+#include <thrust/device_ptr.h>
 #include <thrust/sort.h>
 #include <thrust/functional.h>
 #include <thrust/execution_policy.h>
@@ -46,11 +45,6 @@ void compute_cuts_for_dev(int dev, t_particle *d_ptr, int n,
                           const std::vector<unsigned long long> &splitters,
                           std::vector<int> &cuts, cudaStream_t stream);
 
-int distribute_gpu_particles(std::vector<t_particle *> &d_rank_array,
-                             std::vector<int> &lens,
-                             std::vector<cudaStream_t> &gpu_streams);
-
-void distribute_gpu_particles_mpi(t_particle **d_rank_array, int *lens, int *capacity,
-                                  cudaStream_t stream);
-
+void discover_splitters_gpu(t_particle *d_rank_array, int lens, cudaStream_t stream, std::vector<unsigned long long> &splitters_out);
+void redistribute_by_splitters_gpu(t_particle **d_rank_array, int *lens, int *capacity, const std::vector<unsigned long long> &splitters, cudaStream_t stream);
 #endif

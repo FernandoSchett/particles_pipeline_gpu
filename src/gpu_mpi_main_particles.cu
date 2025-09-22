@@ -108,7 +108,9 @@ int main(int argc, char **argv)
 
     if (cfg.nprocs > 1)
     {
-        distribute_gpu_particles_mpi(&d_rank_array, &cfg.length_per_rank, &capacity, gpu_stream);
+        std::vector<unsigned long long> splitters;
+        discover_splitters_gpu(d_rank_array, cfg.length_per_rank, gpu_stream, splitters);
+        redistribute_by_splitters_gpu(&d_rank_array, &cfg.length_per_rank, &capacity, splitters, gpu_stream);
     }
 
     cudaStreamSynchronize(gpu_stream);
