@@ -17,122 +17,89 @@
 
 #define DEFAULT_POWER 3
 
-void parse_args(int argc, char **argv,
-                int *power, dist_type_t *dist_type,
-                int *seed, exp_type_t *exp_type)
+void parse_args(int argc, char **argv, ExecConfig &cfg)
 {
-    *power = DEFAULT_POWER;
-    *seed = DEFAULT_SEED;
-    *dist_type = DIST_UNKNOWN;
-    *exp_type = STRONG_SCALING;
-
-
+    cfg.power = DEFAULT_POWER;
+    cfg.seed = DEFAULT_SEED;
+    cfg.dist_type = DIST_UNKNOWN;
+    cfg.exp_type = STRONG_SCALING;
     if (argc > 1)
     {
         if (strcmp(argv[1], "box") == 0)
-            *dist_type = DIST_BOX;
+            cfg.dist_type = DIST_BOX;
         else if (strcmp(argv[1], "torus") == 0)
-            *dist_type = DIST_TORUS;
+            cfg.dist_type = DIST_TORUS;
     }
-
-    if (*dist_type == DIST_UNKNOWN)
-        *dist_type = DIST_BOX;
-
+    if (cfg.dist_type == DIST_UNKNOWN)
+        cfg.dist_type = DIST_BOX;
     if (argc > 2)
-        *power = atoi(argv[2]);
-
+        cfg.power = std::atoi(argv[2]);
     if (argc > 3)
-        *seed = atoi(argv[3]);
-
+        cfg.seed = std::atoi(argv[3]);
     if (argc > 4)
     {
         if (strcmp(argv[4], "weak") == 0)
-            *exp_type = WEAK_SCALING;
+            cfg.exp_type = WEAK_SCALING;
         else if (strcmp(argv[4], "strong") == 0)
-            *exp_type = STRONG_SCALING;
+            cfg.exp_type = STRONG_SCALING;
     }
 }
 
 int main(int argc, char **argv)
 {
-    int rank, nprocs;
-    int length_per_rank, total_length;
-    long long total_particles;
-    int *length_vector;
-    t_particle *rank_array;
-    dist_type_t dist_type;
-    int power, seed;
-    double box_length;
-    int major_r, minor_r;
-    double start_time, end_time, mid_time;
-    char filename[128];
-    double RAM_GB;
-    exp_type_t exp_type;
-
     MPI_Init(&argc, &argv);
-    MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    ExecConfig cfg;
+    MPI_Comm_rank(MPI_COMM_WORLD, &cfg.rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &cfg.nprocs);
+    cfg.device = "cpu";
+    parse_args(argc, argv, cfg);
 
-    // You can now use MPI_particle as an input to MPI_Datatype during MPI calls.
     register_MPI_Particle(&MPI_particle);
+    int *length_vector = (int *)std::malloc(cfg.nprocs * sizeof(int));
+    t_particle *rank_array = nullptr;
 
-    parse_args(argc, argv, &power, &dist_type, &seed, &exp_type);
-    length_vector = (int *)malloc(nprocs * sizeof(int));
+    setup_particles_box_length(cfg);
+    MPI_Allgather(&cfg.length_per_rank, 1, MPI_INT, length_vector, 1, MPI_INT, MPI_COMM_WORLD);
+    allocate_particle(&rank_array, cfg.length_per_rank);
 
-    setup_particles_box_length(power, nprocs, rank, &length_per_rank, &box_length, &total_particles, &RAM_GB, &major_r, &minor_r, exp_type);
-
-    // Everybody need to know howm much much particles each other have.
-    MPI_Allgather(&length_per_rank, 1, MPI_INT, length_vector, 1, MPI_INT, MPI_COMM_WORLD);
-    allocate_particle(&rank_array, length_per_rank);
-
-    switch (dist_type)
+    switch (cfg.dist_type)
     {
     case DIST_BOX:
-        box_distribution(&rank_array, length_per_rank, box_length, seed + rank);
+        box_distribution(&rank_array, cfg.length_per_rank, cfg.box_length, cfg.seed + cfg.rank);
         break;
     case DIST_TORUS:
-        torus_distribution(&rank_array, length_per_rank, major_r, minor_r, box_length, seed + rank);
+        torus_distribution(&rank_array, cfg.length_per_rank, cfg.major_r, cfg.minor_r, cfg.box_length, cfg.seed + cfg.rank);
+        break;
+    default:
         break;
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
-    start_time = MPI_Wtime();
-
-    generate_particles_keys(rank_array, length_per_rank, box_length);
-    
+    double t0 = MPI_Wtime();
+    generate_particles_keys(rank_array, cfg.length_per_rank, cfg.box_length);
     MPI_Barrier(MPI_COMM_WORLD);
-    mid_time = MPI_Wtime();
-    
-    distribute_particles(&rank_array, &length_per_rank, nprocs);
-
-    // if(rank == 0){
-    //     print_particles(rank_array, length_per_rank, 0);
-    // }
-
-    // distribute_particles(&rank_array, &length_per_rank, nprocs);
-
-    // Update length_vector
+    double t05 = MPI_Wtime();
+    distribute_particles(&rank_array, &cfg.length_per_rank, cfg.nprocs);
     MPI_Barrier(MPI_COMM_WORLD);
-    end_time = MPI_Wtime();
+    double t1 = MPI_Wtime();
 
-    MPI_Allgather(&length_per_rank, 1, MPI_INT, length_vector, 1, MPI_INT, MPI_COMM_WORLD);
-    if (power < 4)
+    if (cfg.power < 4)
     {
-        sprintf(filename, "particle_file_cpu_n%d_total%lld.par", nprocs, total_particles);
+        char filename[128];
+        std::sprintf(filename, "particle_file_cpu_n%d_total%lld.par", cfg.nprocs, cfg.total_particles);
+        MPI_Allgather(&cfg.length_per_rank, 1, MPI_INT, length_vector, 1, MPI_INT, MPI_COMM_WORLD);
         parallel_write_to_file(rank_array, length_vector, filename);
     }
 
-    if (rank == 0)
-        log_results(rank, power, total_particles, length_per_rank, nprocs, box_length, RAM_GB, mid_time - start_time, end_time - mid_time, "cpu", seed, exp_type);
-
-    total_length = 0;
-    for (int i = 0; i < nprocs; i++)
+    if (cfg.rank == 0)
     {
-        total_length += length_vector[i];
+        const char *mode_str = (cfg.exp_type == WEAK_SCALING) ? "weak" : "strong";
+        std::string out = std::string("../results_") + mode_str + ".csv";
+        log_results(cfg, t05 - t0, t1 - t05, out.c_str());
     }
 
-    free(rank_array);
-    free(length_vector);
+    std::free(rank_array);
+    std::free(length_vector);
     MPI_Type_free(&MPI_particle);
     MPI_Finalize();
     return 0;

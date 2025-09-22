@@ -33,6 +33,23 @@ typedef enum
   STRONG_SCALING,
 } exp_type_t;
 
+typedef struct
+{
+  int rank;
+  int nprocs;
+  int power;
+  int seed;
+  dist_type_t dist_type;
+  exp_type_t exp_type;
+  const char *device;
+  double box_length;
+  int major_r;
+  int minor_r;
+  long long total_particles;
+  int length_per_rank;
+  double ram_gb;
+} ExecConfig;
+
 #define NPROPS_PARTICLE 3
 #define MAX_DEPTH 15
 #define DEFAULT_SEED 24
