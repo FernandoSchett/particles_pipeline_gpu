@@ -26,6 +26,7 @@ int torus_distribution(t_particle **particle_array, int count, double major_r, d
 void run_oct_tree_recursive(std::vector<t_particle *> &particles, int depth, long long key_prefix, double box_length, const std::array<double, 3> &origin);
 int generate_particles_keys(t_particle *particle_array, int count, double box_length);
 
-int distribute_particles(t_particle **particles, int *particle_vector_size, int nprocs);
+void discover_splitters_cpu(t_particle *particles, int local_n, std::vector<unsigned long long> &splitters_out);
 
+int redistribute_by_splitters_cpu(t_particle **particles, int *particle_vector_size, const std::vector<unsigned long long> &splitters);
 #endif

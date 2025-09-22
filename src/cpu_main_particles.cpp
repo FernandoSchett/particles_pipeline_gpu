@@ -79,7 +79,9 @@ int main(int argc, char **argv)
     generate_particles_keys(rank_array, cfg.length_per_rank, cfg.box_length);
     MPI_Barrier(MPI_COMM_WORLD);
     double t05 = MPI_Wtime();
-    distribute_particles(&rank_array, &cfg.length_per_rank, cfg.nprocs);
+    std::vector<unsigned long long> splitters;
+    discover_splitters_cpu(rank_array, cfg.length_per_rank, splitters);
+    redistribute_by_splitters_cpu(&rank_array, &cfg.length_per_rank, splitters);
     MPI_Barrier(MPI_COMM_WORLD);
     double t1 = MPI_Wtime();
 

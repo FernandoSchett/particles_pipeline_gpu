@@ -17,14 +17,14 @@ int register_MPI_Particle(MPI_Datatype *MPI_Particle)
     for (int i = 0; i < NPROPS_PARTICLE; i++)
         displacements[i] = address[i + 1] - address[0];
 
-    MPI_Datatype tmp; // <- tipo intermediário
+    MPI_Datatype tmp;
     MPI_Type_create_struct(NPROPS_PARTICLE, blocklengths, displacements, array_types, &tmp);
 
     MPI_Get_address(&dummy_particle[1], &extent_add);
     extent_add = extent_add - address[0];
 
     MPI_Type_create_resized(tmp, 0, extent_add, MPI_Particle);
-    MPI_Type_free(&tmp); // <- libera o intermediário
+    MPI_Type_free(&tmp);
 
     MPI_Type_size(*MPI_Particle, &type_size);
     MPI_Type_commit(MPI_Particle);
@@ -50,56 +50,81 @@ int allocate_particle(t_particle **particle_array, int count)
 
 int box_distribution(t_particle **particle_array, int count, double box_length, int seed)
 {
-    using RNG = r123::Philox4x32;
-    RNG::key_type key = {{(uint32_t)seed, 0u}};
+    int p_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &p_rank);
 
-    for (int i = 0; i < count; ++i)
+    typedef r123::Philox4x32 RNG;
+    RNG rng;
+    RNG::ctr_type c = {{}};
+    RNG::ukey_type uk = {{}};
+    uk[0] = p_rank; // some user_supplied_seed
+    RNG::key_type k = uk;
+    RNG::ctr_type r;
+
+    c[0] = 07072025;
+    c[1] = 31106712;
+
+    for (int i = 0; i < count; i++)
     {
-        RNG::ctr_type ctr = {{(uint32_t)i, 0u, 0u, 0u}};
-        RNG::ctr_type rnum = RNG()(ctr, key);
+        c[0] += 1;
+        c[1] += 1;
+        r = rng(c, k);
+        (*particle_array)[i].coord[0] = r123::u01<double>(r.v[0]) * box_length;
 
-        double ux = r123::u01<double>(rnum.v[0]);
-        double uy = r123::u01<double>(rnum.v[1]);
-        double uz = r123::u01<double>(rnum.v[2]);
+        c[0] += 1;
+        c[1] += 1;
+        r = rng(c, k);
+        (*particle_array)[i].coord[1] = r123::u01<double>(r.v[0]) * box_length;
 
-        (*particle_array)[i].coord[0] = ux * box_length;
-        (*particle_array)[i].coord[1] = uy * box_length;
-        (*particle_array)[i].coord[2] = uz * box_length;
+        c[0] += 1;
+        c[1] += 1;
+        r = rng(c, k);
+        (*particle_array)[i].coord[2] = r123::u01<double>(r.v[0]) * box_length;
     }
     return 0;
 }
 
-int torus_distribution(t_particle **particle_array, int count, double major_r, double minor_r, double box_length, int seed)
+int torus_distribution(t_particle **particle_array, int count, double major_r, double minor_r, double box_length)
 {
-    using RNG = r123::Philox4x32;
-    RNG::key_type key = {{(uint32_t)seed, 0u}};
-    const double TWO_PI = 6.283185307179586476925286766559;
-    const double center = box_length * 0.5;
+    int p_rank;
+    double theta, phi, r;
+    double center = box_length / 2.0;
 
-    for (int i = 0; i < count; ++i)
+    MPI_Comm_rank(MPI_COMM_WORLD, &p_rank);
+
+    typedef r123::Philox4x32 RNG;
+    RNG rng;
+    RNG::ctr_type c = {{}};
+    RNG::ukey_type uk = {{}};
+    uk[0] = p_rank;
+    RNG::key_type k = uk;
+    RNG::ctr_type rnum;
+
+    c[0] = 25082025;
+    c[1] = 85712394;
+
+    for (int i = 0; i < count; i++)
     {
-        RNG::ctr_type ctr = {{(uint32_t)i, 0u, 0u, 0u}};
-        RNG::ctr_type rnum = RNG()(ctr, key);
+        c[0] += 1;
+        c[1] += 1;
+        rnum = rng(c, k);
+        theta = 2.0 * M_PI * r123::u01<double>(rnum.v[0]);
 
-        double u0 = r123::u01<double>(rnum.v[0]);
-        double u1 = r123::u01<double>(rnum.v[1]);
-        double u2 = r123::u01<double>(rnum.v[2]);
+        c[0] += 1;
+        c[1] += 1;
+        rnum = rng(c, k);
+        phi = 2.0 * M_PI * r123::u01<double>(rnum.v[0]);
 
-        double theta = TWO_PI * u0;
-        double phi   = TWO_PI * u1;
-        double r     = minor_r * std::sqrt(u2);
+        c[0] += 1;
+        c[1] += 1;
+        rnum = rng(c, k);
+        r = minor_r * sqrt(r123::u01<double>(rnum.v[0]));
 
-        double cphi = std::cos(phi);
-        double sphi = std::sin(phi);
-        double cth  = std::cos(theta);
-        double sth  = std::sin(theta);
-
-        double Rplus = major_r + r * cphi;
-
-        (*particle_array)[i].coord[0] = center + Rplus * cth;
-        (*particle_array)[i].coord[1] = center + Rplus * sth;
-        (*particle_array)[i].coord[2] = center + r * sphi;
+        (*particle_array)[i].coord[0] = center + (major_r + r * cos(phi)) * cos(theta);
+        (*particle_array)[i].coord[1] = center + (major_r + r * cos(phi)) * sin(theta);
+        (*particle_array)[i].coord[2] = center + r * sin(phi);
     }
+
     return 0;
 }
 
@@ -208,43 +233,47 @@ struct particle_rightshift
     }
 };
 
-int distribute_particles(t_particle **particles, int *particle_vector_size, int nprocs)
+void discover_splitters_cpu(t_particle *particles, int local_n,
+                            std::vector<unsigned long long> &splitters_out)
 {
-    boost::sort::spreadsort::integer_sort(*particles, *particles + *particle_vector_size, particle_rightshift{}, particle_less{});
-
-    int rank;
+    int rank, nprocs;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    const int local_n = *particle_vector_size;
+    MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+
+    boost::sort::spreadsort::integer_sort(
+        particles, particles + local_n, particle_rightshift{}, particle_less{});
 
     long long N_local = local_n, N_global = 0;
     MPI_Allreduce(&N_local, &N_global, 1, MPI_LONG_LONG_INT, MPI_SUM, MPI_COMM_WORLD);
+    if (N_global == 0)
+    {
+        splitters_out.clear();
+        return;
+    }
 
     unsigned long long local_min = std::numeric_limits<unsigned long long>::max();
-    unsigned long long local_max = 0;
+    unsigned long long local_max = 0ull;
     if (local_n > 0)
     {
-        local_min = (unsigned long long)((*particles)[0].key);
-        local_max = (unsigned long long)((*particles)[local_n - 1].key);
+        local_min = (unsigned long long)particles[0].key;
+        local_max = (unsigned long long)particles[local_n - 1].key;
     }
-    unsigned long long gmin, gmax;
+    unsigned long long gmin = 0ull, gmax = 0ull;
     MPI_Allreduce(&local_min, &gmin, 1, MPI_UNSIGNED_LONG_LONG, MPI_MIN, MPI_COMM_WORLD);
     MPI_Allreduce(&local_max, &gmax, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, MPI_COMM_WORLD);
 
-    std::vector<unsigned long long> splitters;
-    splitters.reserve(nprocs > 0 ? nprocs - 1 : 0);
+    splitters_out.clear();
+    splitters_out.reserve(nprocs > 0 ? nprocs - 1 : 0);
 
     unsigned long long lo_base = gmin;
     for (int i = 1; i < nprocs; ++i)
     {
-        long long target = (N_global * i + nprocs - 1) / nprocs;
-
-        unsigned long long lo = lo_base;
-        unsigned long long hi = gmax;
-
+        const long long target = (N_global * i + nprocs - 1) / nprocs;
+        unsigned long long lo = lo_base, hi = gmax;
         while (lo < hi)
         {
-            unsigned long long mid = lo + ((hi - lo) >> 1);
-            long long c_local = count_leq(*particles, local_n, mid);
+            const unsigned long long mid = lo + ((hi - lo) >> 1);
+            long long c_local = count_leq(particles, local_n, mid);
             long long c_global = 0;
             MPI_Allreduce(&c_local, &c_global, 1, MPI_LONG_LONG_INT, MPI_SUM, MPI_COMM_WORLD);
             if (c_global >= target)
@@ -252,9 +281,20 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
             else
                 lo = mid + 1;
         }
-        splitters.push_back(lo);
+        splitters_out.push_back(lo);
         lo_base = lo;
     }
+}
+
+int redistribute_by_splitters_cpu(t_particle **particles,
+                                  int *particle_vector_size,
+                                  const std::vector<unsigned long long> &splitters)
+{
+    int rank, nprocs;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+
+    const int local_n = *particle_vector_size;
 
     std::vector<int> sendcounts(nprocs, 0), sdispls(nprocs, 0);
     if (nprocs == 1)
@@ -289,6 +329,7 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
     MPI_Alltoall(sendcounts.data(), 1, MPI_INT, recvcounts.data(), 1, MPI_INT, MPI_COMM_WORLD);
     for (int i = 1; i < nprocs; ++i)
         rdispls[i] = rdispls[i - 1] + recvcounts[i - 1];
+
     int recv_total = 0;
     for (int x : recvcounts)
         recv_total += x;
@@ -298,7 +339,7 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
     {
         if (nprocs == 1)
         {
-            memcpy(sendbuf.data(), *particles, local_n * sizeof(t_particle));
+            std::memcpy(sendbuf.data(), *particles, local_n * sizeof(t_particle));
         }
         else
         {
@@ -309,8 +350,7 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
             {
                 t_particle probe;
                 probe.key = (long long)s;
-                auto it = std::upper_bound(
-                    *particles, *particles + local_n, probe, key_less);
+                auto it = std::upper_bound(*particles, *particles + local_n, probe, key_less);
                 cuts.push_back((int)(it - *particles));
             }
             cuts.push_back(local_n);
@@ -321,7 +361,7 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
                 int amt = end - begin;
                 if (amt > 0)
                 {
-                    memcpy(sendbuf.data() + sdispls[b],
+                    std::memcpy(sendbuf.data() + sdispls[b],
                                 *particles + begin,
                                 amt * sizeof(t_particle));
                 }
@@ -339,7 +379,7 @@ int distribute_particles(t_particle **particles, int *particle_vector_size, int 
 
     free(*particles);
     t_particle *newbuf = (t_particle *)malloc(recvbuf.size() * sizeof(t_particle));
-    memcpy(newbuf, recvbuf.data(), recvbuf.size() * sizeof(t_particle));
+    std::memcpy(newbuf, recvbuf.data(), recvbuf.size() * sizeof(t_particle));
     *particles = newbuf;
     *particle_vector_size = (int)recvbuf.size();
 
