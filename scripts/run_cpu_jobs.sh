@@ -9,7 +9,7 @@ PARTITION=batch
 TIMES=5
 SEED=69
 
-LOGDIR="cpu_logdir__$5"
+LOGDIR="cpu_logdir_s$SEED"
 
 if [ -d "$LOGDIR" ]; then
   rm -rf "$LOGDIR"

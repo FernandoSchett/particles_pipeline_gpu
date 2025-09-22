@@ -223,10 +223,11 @@ void distribute_gpu_particles_mpi(t_particle **d_rank_array, int *lens, int *cap
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
 
-    dbg_mem("before sort");
+    //dbg_mem("before sort");
     {
         auto pol = thrust::cuda::par.on(stream);
         thrust::device_ptr<t_particle> first(*d_rank_array), last(*d_rank_array + *lens);
+        //dbg_mem("before pointers");
         thrust::sort(pol, first, last, key_less{});
     }
 
