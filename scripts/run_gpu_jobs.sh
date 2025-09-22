@@ -7,17 +7,10 @@ PARTITION=booster
 TIMES=5
 SEED=69
 
-LOGDIR="gpu_logdir_s$SEED"
-
-if [ -d "$LOGDIR" ]; then
-  rm -rf "$LOGDIR"
-fi
-
-mkdir -p "$LOGDIR"
 
 for mode in weak strong
 do
-    LOGDIR="gpu_logdir_s${SEED}_m${mode}"
+    LOGDIR="gpu_logdir_s${SEED}_M${mode}"
     
     if [ -d "$LOGDIR" ]; then
       rm -rf "$LOGDIR"
@@ -25,6 +18,8 @@ do
     
     mkdir -p "$LOGDIR"
 
+    rm  *.par
+    
     for pp in 8
     do
         for ngpu in 1 2 4 6 8 16 24 32 50 64 128 256
@@ -40,9 +35,9 @@ do
                 --time=05:00:00 \
                 --partition=$PARTITION \
                 --account=gsp25 \
-                --job-name=exp_pp${pp}_gpu${ngpu}_seed${SEED}_mode${mode} \
-                --output=${LOGDIR}/exp_pp${pp}_gpu${ngpu}_seed${SEED}_m${mode}%j.out \
-                --error=${LOGDIR}/exp_pp${pp}_gpu${ngpu}_seed${SEED}_m${mode}%j.err \
+                --job-name=exp_pp${pp}_gpu${ngpu}_seed${SEED}_M${mode} \
+                --output=${LOGDIR}/exp_pp${pp}_gpu${ngpu}_S${SEED}_M${mode}%j.out \
+                --error=${LOGDIR}/exp_pp${pp}_gpu${ngpu}_S${SEED}_M${mode}%j.err \
                 ./run_gpu_experiment.sh torus $pp $TIMES $ngpu $SEED $mode
         done
     done

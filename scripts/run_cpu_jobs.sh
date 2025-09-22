@@ -12,13 +12,15 @@ SEED=69
 
 for mode in weak strong 
 do
-    LOGDIR="cpu_logdir_s${SEED}_m${mode}"
+    LOGDIR="cpu_logdir_s${SEED}_M${mode}"
     
     if [ -d "$LOGDIR" ]; then
       rm -rf "$LOGDIR"
     fi
     
     mkdir -p "$LOGDIR"
+
+    rm  *.par
     
     for pp in 3
     do
@@ -34,9 +36,9 @@ do
                 --time=05:00:00 \
                 --partition=$PARTITION \
                 --account=gsp25 \
-                --job-name=exp_pp${pp}_np${np}_seed${SEED}_mode${mode} \
-                --output=${LOGDIR}/exp_pp${pp}_cpu${np}_seed${SEED}_mode${mode}%j.out \
-                --error=${LOGDIR}/exp_pp${pp}_cpu${np}_seed${SEED}_mode${mode}%j.err \
+                --job-name=exp_pp${pp}_np${np}_seed${SEED}_M${mode} \
+                --output=${LOGDIR}/exp_pp${pp}_cpu${np}_S${SEED}_M${mode}%j.out \
+                --error=${LOGDIR}/exp_pp${pp}_cpu${np}_S${SEED}_M${mode}%j.err \
                 ./run_cpu_experiment.sh $np torus $pp $TIMES $SEED $mode 
         done
     done
