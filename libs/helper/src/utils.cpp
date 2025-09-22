@@ -48,13 +48,6 @@ void setup_particles_box_length(ExecConfig &cfg)
     }
 }
 
-typedef struct
-{
-    double gen_time;
-    double splitters_time;
-    double dist_time;
-    double total_time;
-} exec_times;
 
 void log_results(const ExecConfig &cfg, const exec_times &times, const char *results_path)
 {

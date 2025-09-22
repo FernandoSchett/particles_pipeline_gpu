@@ -50,81 +50,55 @@ int allocate_particle(t_particle **particle_array, int count)
 
 int box_distribution(t_particle **particle_array, int count, double box_length, int seed)
 {
-    int p_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &p_rank);
+    using RNG = r123::Philox4x32;
+    RNG::key_type key = {{(uint32_t)seed, 0u}};
 
-    typedef r123::Philox4x32 RNG;
-    RNG rng;
-    RNG::ctr_type c = {{}};
-    RNG::ukey_type uk = {{}};
-    uk[0] = p_rank; // some user_supplied_seed
-    RNG::key_type k = uk;
-    RNG::ctr_type r;
-
-    c[0] = 07072025;
-    c[1] = 31106712;
-
-    for (int i = 0; i < count; i++)
+    for (int i = 0; i < count; ++i)
     {
-        c[0] += 1;
-        c[1] += 1;
-        r = rng(c, k);
-        (*particle_array)[i].coord[0] = r123::u01<double>(r.v[0]) * box_length;
+        RNG::ctr_type ctr = {{(uint32_t)i, 0u, 0u, 0u}};
+        RNG::ctr_type rnum = RNG()(ctr, key);
 
-        c[0] += 1;
-        c[1] += 1;
-        r = rng(c, k);
-        (*particle_array)[i].coord[1] = r123::u01<double>(r.v[0]) * box_length;
+        double ux = r123::u01<double>(rnum.v[0]);
+        double uy = r123::u01<double>(rnum.v[1]);
+        double uz = r123::u01<double>(rnum.v[2]);
 
-        c[0] += 1;
-        c[1] += 1;
-        r = rng(c, k);
-        (*particle_array)[i].coord[2] = r123::u01<double>(r.v[0]) * box_length;
+        (*particle_array)[i].coord[0] = ux * box_length;
+        (*particle_array)[i].coord[1] = uy * box_length;
+        (*particle_array)[i].coord[2] = uz * box_length;
     }
     return 0;
-}
 
-int torus_distribution(t_particle **particle_array, int count, double major_r, double minor_r, double box_length)
+int torus_distribution(t_particle **particle_array, int count, double major_r, double minor_r, double box_length, int seed)
 {
-    int p_rank;
-    double theta, phi, r;
-    double center = box_length / 2.0;
+    using RNG = r123::Philox4x32;
+    RNG::key_type key = {{(uint32_t)seed, 0u}};
+    const double TWO_PI = 6.283185307179586476925286766559;
+    const double center = box_length * 0.5;
 
-    MPI_Comm_rank(MPI_COMM_WORLD, &p_rank);
-
-    typedef r123::Philox4x32 RNG;
-    RNG rng;
-    RNG::ctr_type c = {{}};
-    RNG::ukey_type uk = {{}};
-    uk[0] = p_rank;
-    RNG::key_type k = uk;
-    RNG::ctr_type rnum;
-
-    c[0] = 25082025;
-    c[1] = 85712394;
-
-    for (int i = 0; i < count; i++)
+    for (int i = 0; i < count; ++i)
     {
-        c[0] += 1;
-        c[1] += 1;
-        rnum = rng(c, k);
-        theta = 2.0 * M_PI * r123::u01<double>(rnum.v[0]);
+        RNG::ctr_type ctr = {{(uint32_t)i, 0u, 0u, 0u}};
+        RNG::ctr_type rnum = RNG()(ctr, key);
 
-        c[0] += 1;
-        c[1] += 1;
-        rnum = rng(c, k);
-        phi = 2.0 * M_PI * r123::u01<double>(rnum.v[0]);
+        double u0 = r123::u01<double>(rnum.v[0]);
+        double u1 = r123::u01<double>(rnum.v[1]);
+        double u2 = r123::u01<double>(rnum.v[2]);
 
-        c[0] += 1;
-        c[1] += 1;
-        rnum = rng(c, k);
-        r = minor_r * sqrt(r123::u01<double>(rnum.v[0]));
+        double theta = TWO_PI * u0;
+        double phi   = TWO_PI * u1;
+        double r     = minor_r * std::sqrt(u2);
 
-        (*particle_array)[i].coord[0] = center + (major_r + r * cos(phi)) * cos(theta);
-        (*particle_array)[i].coord[1] = center + (major_r + r * cos(phi)) * sin(theta);
-        (*particle_array)[i].coord[2] = center + r * sin(phi);
+        double cphi = std::cos(phi);
+        double sphi = std::sin(phi);
+        double cth  = std::cos(theta);
+        double sth  = std::sin(theta);
+
+        double Rplus = major_r + r * cphi;
+
+        (*particle_array)[i].coord[0] = center + Rplus * cth;
+        (*particle_array)[i].coord[1] = center + Rplus * sth;
+        (*particle_array)[i].coord[2] = center + r * sphi;
     }
-
     return 0;
 }
 
