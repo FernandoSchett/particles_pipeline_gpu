@@ -3,6 +3,9 @@ build/
 scripts/*.out
 *.par
 scripts/*.par
+.ipynb_checkpoints/
 scripts/*_logdir/
 scripts/*jwc
 scripts/core.jwb*.juwels.*
+results/
+

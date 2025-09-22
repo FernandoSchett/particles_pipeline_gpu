@@ -25,26 +25,26 @@ void print_particles(t_particle *particle_array, int size, int rank)
     }
 }
 
-void setup_particles_box_length(ExecConfig *cfg)
+void setup_particles_box_length(ExecConfig &cfg)
 {
-    const long long base = static_cast<long long>(std::pow(10.0, cfg->power));
-    const long long T = static_cast<long long>(cfg->nprocs) * (cfg->nprocs + 1) / 2;
+    const long long base = static_cast<long long>(std::pow(10.0, cfg.power));
+    const long long T = static_cast<long long>(cfg.nprocs) * (cfg.nprocs + 1) / 2;
     const long long slice = base / T;
     const long long rem = base - slice * T;
 
-    cfg->total_particles = base;
-    cfg->box_length = std::pow(10.0, cfg->power);
-    cfg->length_per_rank = static_cast<int>((static_cast<long long>(cfg->rank + 1) * slice) +
-                                            ((cfg->rank == cfg->nprocs - 1) ? rem : 0));
-    cfg->major_r = static_cast<int>(4 * std::pow(10.0, cfg->power - 1));
-    cfg->minor_r = static_cast<int>(2 * std::pow(10.0, cfg->power - 1));
-    cfg->ram_gb = (cfg->length_per_rank * 40.0) / 1e9;
+    cfg.total_particles = base;
+    cfg.box_length = std::pow(10.0, cfg.power);
+    cfg.length_per_rank = static_cast<int>((static_cast<long long>(cfg.rank + 1) * slice) +
+                                            ((cfg.rank == cfg.nprocs - 1) ? rem : 0));
+    cfg.major_r = static_cast<int>(4 * std::pow(10.0, cfg.power - 1));
+    cfg.minor_r = static_cast<int>(2 * std::pow(10.0, cfg.power - 1));
+    cfg.ram_gb = (cfg.length_per_rank * 40.0) / 1e9;
 
-    if (cfg->rank == 0)
+    if (cfg.rank == 0)
     {
         std::printf("%lld particles distributed like (rank_number*%lld) between %d processes "
                     "in a %.1f sized box using %.4f GBs (per process).\n",
-                    cfg->total_particles, slice, cfg->nprocs, cfg->box_length, cfg->ram_gb);
+                    cfg.total_particles, slice, cfg.nprocs, cfg.box_length, cfg.ram_gb);
     }
 }
 
