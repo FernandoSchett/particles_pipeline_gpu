@@ -22,7 +22,7 @@ def analyze_scaling(csv_file, prefix,
                     PLOT_SPEEDUP_TOTAL=True, 
                     PLOT_EFF_TOTAL=True, 
                     PLOT_EFF_DIST_GEN=True,
-                    PLOT_TIME_VS_NODES=True,   # agora faz dist/gen/total
+                    PLOT_TIME_VS_NODES=True,
                     BASELINE_NPROCS=None):
 
     results_dir = BASE_RESULTS_DIR / prefix
@@ -63,6 +63,7 @@ def analyze_scaling(csv_file, prefix,
     def savefig(name):
         plt.tight_layout()
         plt.savefig(results_dir / f"{name}.png", dpi=150)
+        plt.show()
         plt.close()
 
     if PLOT_BARS:
@@ -138,65 +139,59 @@ def analyze_scaling(csv_file, prefix,
     if PLOT_SPEEDUP_DIST:
         with_base["speedup_dist"]   = ratio(with_base["dist_cpu"], with_base["dist_mean"])
         with_base["speedup_dist_s"] = ratio_std(with_base["dist_cpu"], with_base["dist_cpu_std"], with_base["dist_mean"], with_base["dist_std"])
-        def plot_speedup_dist():
-            plt.figure(figsize=(8,5))
-            for dev in with_base["device"].unique():
-                sub = with_base[with_base["device"] == dev].sort_values("num_procs")
-                plt.errorbar(sub["num_procs"], sub["speedup_dist"], yerr=sub["speedup_dist_s"], marker="o", capsize=4, label=dev)
-            plt.axhline(1.0, ls="--", lw=1)
-            for pw in sorted(with_base["power"].unique()):
-                g = with_base[with_base["power"] == pw]
-                if g.empty: continue
-                nref = g["cpu_base_nprocs"].iloc[0]
-                xs = sorted(g["num_procs"].unique())
-                ys = [x/nref for x in xs]
-                plt.plot(xs, ys, ls=":", lw=1.5, label=f"Ideal (p{pw}, N/Nref={nref})")
-            plt.xlabel("Number of processors"); plt.ylabel("Speedup (distribution)")
-            plt.title("Speedup vs CPU (Distribution)"); plt.legend(); plt.grid(True)
-            savefig("speedup_distribution")
-        plot_speedup_dist()
+        plt.figure(figsize=(8,5))
+        for dev in with_base["device"].unique():
+            sub = with_base[with_base["device"] == dev].sort_values("num_procs")
+            plt.errorbar(sub["num_procs"], sub["speedup_dist"], yerr=sub["speedup_dist_s"], marker="o", capsize=4, label=dev)
+        plt.axhline(1.0, ls="--", lw=1)
+        for pw in sorted(with_base["power"].unique()):
+            g = with_base[with_base["power"] == pw]
+            if g.empty: continue
+            nref = g["cpu_base_nprocs"].iloc[0]
+            xs = sorted(g["num_procs"].unique())
+            ys = [x/nref for x in xs]
+            plt.plot(xs, ys, ls=":", lw=1.5, label=f"Ideal (p{pw}, N/Nref={nref})")
+        plt.xlabel("Number of processors"); plt.ylabel("Speedup (distribution)")
+        plt.title("Speedup vs CPU (Distribution)"); plt.legend(); plt.grid(True)
+        savefig("speedup_distribution")
 
     if PLOT_SPEEDUP_GEN:
         with_base["speedup_gen"]   = ratio(with_base["gen_cpu"], with_base["gen_mean"])
         with_base["speedup_gen_s"] = ratio_std(with_base["gen_cpu"], with_base["gen_cpu_std"], with_base["gen_mean"], with_base["gen_std"])
-        def plot_speedup_gen():
-            plt.figure(figsize=(8,5))
-            for dev in with_base["device"].unique():
-                sub = with_base[with_base["device"] == dev].sort_values("num_procs")
-                plt.errorbar(sub["num_procs"], sub["speedup_gen"], yerr=sub["speedup_gen_s"], marker="o", capsize=4, label=dev)
-            plt.axhline(1.0, ls="--", lw=1)
-            for pw in sorted(with_base["power"].unique()):
-                g = with_base[with_base["power"] == pw]
-                if g.empty: continue
-                nref = g["cpu_base_nprocs"].iloc[0]
-                xs = sorted(g["num_procs"].unique())
-                ys = [x/nref for x in xs]
-                plt.plot(xs, ys, ls=":", lw=1.5, label=f"Ideal (p{pw}, N/Nref={nref})")
-            plt.xlabel("Number of processors"); plt.ylabel("Speedup (generation)")
-            plt.title("Speedup vs CPU (Generation)"); plt.legend(); plt.grid(True)
-            savefig("speedup_generation")
-        plot_speedup_gen()
+        plt.figure(figsize=(8,5))
+        for dev in with_base["device"].unique():
+            sub = with_base[with_base["device"] == dev].sort_values("num_procs")
+            plt.errorbar(sub["num_procs"], sub["speedup_gen"], yerr=sub["speedup_gen_s"], marker="o", capsize=4, label=dev)
+        plt.axhline(1.0, ls="--", lw=1)
+        for pw in sorted(with_base["power"].unique()):
+            g = with_base[with_base["power"] == pw]
+            if g.empty: continue
+            nref = g["cpu_base_nprocs"].iloc[0]
+            xs = sorted(g["num_procs"].unique())
+            ys = [x/nref for x in xs]
+            plt.plot(xs, ys, ls=":", lw=1.5, label=f"Ideal (p{pw}, N/Nref={nref})")
+        plt.xlabel("Number of processors"); plt.ylabel("Speedup (generation)")
+        plt.title("Speedup vs CPU (Generation)"); plt.legend(); plt.grid(True)
+        savefig("speedup_generation")
 
     if PLOT_SPEEDUP_TOTAL:
         with_base["speedup_total"]   = ratio(with_base["total_cpu"], with_base["total_mean"])
         with_base["speedup_total_s"] = ratio_std(with_base["total_cpu"], with_base["total_cpu_std"], with_base["total_mean"], with_base["total_std"])
-        def plot_speedup_total():
-            plt.figure(figsize=(8,5))
-            for dev in with_base["device"].unique():
-                sub = with_base[with_base["device"] == dev].sort_values("num_procs")
-                plt.errorbar(sub["num_procs"], sub["speedup_total"], yerr=sub["speedup_total_s"], marker="o", capsize=4, label=dev)
-            plt.axhline(1.0, ls="--", lw=1)
-            for pw in sorted(with_base["power"].unique()):
-                g = with_base[with_base["power"] == pw]
-                if g.empty: continue
-                nref = g["cpu_base_nprocs"].iloc[0]
-                xs = sorted(g["num_procs"].unique())
-                ys = [x/nref for x in xs]
-                plt.plot(xs, ys, ls=":", lw=1.5, label=f"Ideal (p{pw}, N/Nref={nref})")
-            plt.xlabel("Number of processors"); plt.ylabel("Speedup (total)")
-            plt.title("Speedup vs CPU (Total)"); plt.legend(); plt.grid(True)
-            savefig("speedup_total")
-        plot_speedup_total()
+        plt.figure(figsize=(8,5))
+        for dev in with_base["device"].unique():
+            sub = with_base[with_base["device"] == dev].sort_values("num_procs")
+            plt.errorbar(sub["num_procs"], sub["speedup_total"], yerr=sub["speedup_total_s"], marker="o", capsize=4, label=dev)
+        plt.axhline(1.0, ls="--", lw=1)
+        for pw in sorted(with_base["power"].unique()):
+            g = with_base[with_base["power"] == pw]
+            if g.empty: continue
+            nref = g["cpu_base_nprocs"].iloc[0]
+            xs = sorted(with_base["num_procs"].unique())
+            ys = [x/nref for x in xs]
+            plt.plot(xs, ys, ls=":", lw=1.5, label=f"Ideal (p{pw}, N/Nref={nref})")
+        plt.xlabel("Number of processors"); plt.ylabel("Speedup (total)")
+        plt.title("Speedup vs CPU (Total)"); plt.legend(); plt.grid(True)
+        savefig("speedup_total")
 
     if PLOT_EFF_TOTAL or PLOT_EFF_DIST_GEN:
         ref = (summary.sort_values(["device","power","num_procs"]).groupby(["device","power"],as_index=False).first())
@@ -206,7 +201,7 @@ def analyze_scaling(csv_file, prefix,
         good = (eff_total["t_ref"]>0)&(eff_total["total_mean"]>0)&np.isfinite(eff_total["t_ref"])&np.isfinite(eff_total["total_mean"])
         eff_total["eff_strong_s"] = np.nan
         eff_total.loc[good,"eff_strong_s"] = eff_total.loc[good,"eff_strong"]*np.sqrt(
-            (eff_total.loc[good,"s_ref"]/eff_total.loc[good,"t_ref"])**2 + (eff_total.loc[good,"total_std"]/eff_total.loc[good,"total_mean"])**2
+            (eff_total.loc[good,"s_ref"]/eff_total["t_ref"])**2 + (eff_total.loc[good,"total_std"]/eff_total["total_mean"])**2
         )
         if PLOT_EFF_TOTAL:
             plt.figure(figsize=(8,5))
@@ -237,7 +232,7 @@ def analyze_scaling(csv_file, prefix,
             plot_eff("gen_mean","gen_std","Parallel efficiency — Generation","efficiency_generation")
 
     if PLOT_TIME_VS_NODES:
-        def plot_vs_nodes(y_mean, y_std, title, fname):
+        def plot_vs_nodes(y_mean, y_std, title, fname, y_label):
             plt.figure(figsize=(8,5))
             agg_nodes = (summary.groupby(["device","power","nodes"], as_index=False)
                                 .agg(y_mean=(y_mean,"mean"),
@@ -246,15 +241,15 @@ def analyze_scaling(csv_file, prefix,
                 plt.errorbar(g["nodes"], g["y_mean"], yerr=g["y_std"],
                              marker="o", capsize=4, label=f"{dev} (p{pw})")
             plt.xlabel("Number of nodes used")
-            plt.ylabel(title.split(" vs ")[0])  # label simples coerente com título
-            plt.title(f"{title}")
+            plt.ylabel(y_label)
+            plt.title(title)
             plt.legend(); plt.grid(True)
             savefig(fname)
 
-        plot_vs_nodes("dist_mean","dist_std","Distribution time vs nodes used","time_vs_nodes_distribution")
-        plot_vs_nodes("gen_mean","gen_std","Generation time vs nodes used","time_vs_nodes_generation")
-        plot_vs_nodes("total_mean","total_std","Total time vs nodes used","time_vs_nodes_total")
+        plot_vs_nodes("dist_mean","dist_std","Distribution time vs nodes used","time_vs_nodes_distribution","Distribution time (s)")
+        plot_vs_nodes("gen_mean","gen_std","Generation time vs nodes used","time_vs_nodes_generation","Generation time (s)")
+        plot_vs_nodes("total_mean","total_std","Total time vs nodes used","time_vs_nodes_total","Total time (s)")
 
 # %%
-analyze_scaling("results_strong.csv", "strong")
+#analyze_scaling("results_strong.csv", "strong")
 analyze_scaling("results_weak.csv", "weak")
