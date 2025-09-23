@@ -18,37 +18,41 @@
 
 #define DEFAULT_POWER 3
 
-void setup_particles_box_length(ExecConfig &cfg)
+void parse_args(int argc, char **argv, ExecConfig &cfg)
 {
-    const long long base = static_cast<long long>(std::pow(10.0, cfg.power));
+    cfg.power = DEFAULT_POWER;
+    cfg.seed = DEFAULT_SEED;
+    cfg.dist_type = DIST_UNKNOWN;
+    cfg.exp_type = STRONG_SCALING;
+    cfg.alg_type = GLOBAL_SORTING;
 
-    cfg.box_length = std::pow(10.0, cfg.power);
-    cfg.major_r = static_cast<int>(4 * std::pow(10.0, cfg.power - 1));
-    cfg.minor_r = static_cast<int>(2 * std::pow(10.0, cfg.power - 1));
-
-    if (cfg.exp_type == WEAK_SCALING)
+    if (argc > 1)
     {
-        cfg.length_per_rank = static_cast<int>(base);
-        cfg.total_particles = base * static_cast<long long>(cfg.nprocs);
+        if (strcmp(argv[1], "box") == 0)
+            cfg.dist_type = DIST_BOX;
+        else if (strcmp(argv[1], "torus") == 0)
+            cfg.dist_type = DIST_TORUS;
     }
-    else
+    if (cfg.dist_type == DIST_UNKNOWN)
+        cfg.dist_type = DIST_BOX;
+    if (argc > 2)
+        cfg.power = std::atoi(argv[2]);
+    if (argc > 3)
+        cfg.seed = std::atoi(argv[3]);
+    if (argc > 4)
     {
-        const long long T = static_cast<long long>(cfg.nprocs) * (cfg.nprocs + 1) / 2;
-        const long long slice = base / T;
-        const long long rem = base - slice * T;
-
-        cfg.total_particles = base;
-        cfg.length_per_rank = static_cast<int>((static_cast<long long>(cfg.rank + 1) * slice) +
-                                               ((cfg.rank == cfg.nprocs - 1) ? rem : 0));
+        if (strcmp(argv[4], "weak") == 0)
+            cfg.exp_type = WEAK_SCALING;
+        else if (strcmp(argv[4], "strong") == 0)
+            cfg.exp_type = STRONG_SCALING;
     }
 
-    cfg.ram_gb = (cfg.length_per_rank * 40.0) / 1e9;
-
-    if (cfg.rank == 0)
+    if (argc > 5)
     {
-        const char *mode_str = (cfg.exp_type == WEAK_SCALING) ? "weak" : "strong";
-        std::printf("%lld particles (%s) between %d processes in a %.1f sized box using %.4f GBs (per process).\n",
-                    cfg.total_particles, mode_str, cfg.nprocs, cfg.box_length, cfg.ram_gb);
+        if (strcmp(argv[5], "table") == 0)
+            cfg.alg_type = BUILD_TABLE;
+        else if (strcmp(argv[5], "total") == 0)
+            cfg.alg_type = GLOBAL_SORTING;
     }
 }
 
