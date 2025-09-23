@@ -28,26 +28,36 @@ void print_particles(t_particle *particle_array, int size, int rank)
 void setup_particles_box_length(ExecConfig &cfg)
 {
     const long long base = static_cast<long long>(std::pow(10.0, cfg.power));
-    const long long T = static_cast<long long>(cfg.nprocs) * (cfg.nprocs + 1) / 2;
-    const long long slice = base / T;
-    const long long rem = base - slice * T;
+    const long long n = static_cast<long long>(cfg.nprocs);
+    const long long T = n * (n + 1) / 2;
 
-    cfg.total_particles = base;
     cfg.box_length = std::pow(10.0, cfg.power);
-    cfg.length_per_rank = static_cast<int>((static_cast<long long>(cfg.rank + 1) * slice) +
-                                           ((cfg.rank == cfg.nprocs - 1) ? rem : 0));
     cfg.major_r = static_cast<int>(4 * std::pow(10.0, cfg.power - 1));
     cfg.minor_r = static_cast<int>(2 * std::pow(10.0, cfg.power - 1));
+
+    long long target_total = base;
+    if (cfg.exp_type == WEAK_SCALING)
+        target_total = base * n;
+
+    const long long slice = target_total / T;
+    const long long rem = target_total - slice * T;
+
+    cfg.total_particles = target_total;
+    cfg.length_per_rank = static_cast<int>(
+        (static_cast<long long>(cfg.rank + 1) * slice) +
+        ((cfg.rank == cfg.nprocs - 1) ? rem : 0));
+
     cfg.ram_gb = (cfg.length_per_rank * 40.0) / 1e9;
 
     if (cfg.rank == 0)
     {
-        std::printf("%lld particles distributed like (rank_number*%lld) between %d processes "
-                    "in a %.1f sized box using %.4f GBs (per process).\n",
-                    cfg.total_particles, slice, cfg.nprocs, cfg.box_length, cfg.ram_gb);
+        const char *mode_str = (cfg.exp_type == WEAK_SCALING) ? "weak" : "strong";
+        std::printf("%lld particles (%s), triangular across %d processes "
+                    "(len_k ≈ (k+1)*%lld, remainder=%lld) in a %.1f box; per-rank RAM ~ %.4f GB.\n",
+                    cfg.total_particles, mode_str, cfg.nprocs, slice, rem,
+                    cfg.box_length, cfg.ram_gb);
     }
 }
-
 
 void log_results(const ExecConfig &cfg, const exec_times &times, const char *results_path)
 {
