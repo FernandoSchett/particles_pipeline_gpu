@@ -8,6 +8,7 @@
 #include <ctime>
 #include <time.h>
 #include <sys/stat.h>
+#include <cstring>
 
 #include "particle_types.hpp"
 #include "particles_cpu.hpp"
@@ -23,6 +24,8 @@ void parse_args(int argc, char **argv, ExecConfig &cfg)
     cfg.seed = DEFAULT_SEED;
     cfg.dist_type = DIST_UNKNOWN;
     cfg.exp_type = STRONG_SCALING;
+    cfg.alg_type = GLOBAL_SORTING;
+
     if (argc > 1)
     {
         if (strcmp(argv[1], "box") == 0)
@@ -42,6 +45,13 @@ void parse_args(int argc, char **argv, ExecConfig &cfg)
             cfg.exp_type = WEAK_SCALING;
         else if (strcmp(argv[4], "strong") == 0)
             cfg.exp_type = STRONG_SCALING;
+    }
+    if (argc > 5)
+    {
+        if (strcmp(argv[5], "table") == 0)
+            cfg.alg_type = BUILD_TABLE;
+        else if (strcmp(argv[5], "total") == 0)
+            cfg.alg_type = GLOBAL_SORTING;
     }
 }
 
@@ -84,15 +94,30 @@ int main(int argc, char **argv)
 
     MPI_Barrier(MPI_COMM_WORLD);
     double t1 = MPI_Wtime();
+    double t2 = t1, t3 = t1;
 
-    discover_splitters_cpu(rank_array, cfg.length_per_rank, splitters);
+    switch (cfg.alg_type)
+    {
+    case GLOBAL_SORTING:
+        if (cfg.nprocs > 1)
+            discover_splitters_cpu(rank_array, cfg.length_per_rank, splitters);
 
-    MPI_Barrier(MPI_COMM_WORLD);
-    double t2 = MPI_Wtime();
+        MPI_Barrier(MPI_COMM_WORLD);
+        t2 = MPI_Wtime();
 
-    redistribute_by_splitters_cpu(&rank_array, &cfg.length_per_rank, splitters);
-    MPI_Barrier(MPI_COMM_WORLD);
-    double t3 = MPI_Wtime();
+        if (cfg.nprocs > 1)
+            redistribute_by_splitters_cpu(&rank_array, &cfg.length_per_rank, splitters);
+
+        MPI_Barrier(MPI_COMM_WORLD);
+        t3 = MPI_Wtime();
+        break;
+
+    case BUILD_TABLE:
+        // adicionar implementação futura aqui, se necessário
+        t2 = t1;
+        t3 = t1;
+        break;
+    }
 
     if (cfg.power < 4)
     {

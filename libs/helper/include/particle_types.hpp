@@ -33,6 +33,12 @@ typedef enum
   STRONG_SCALING,
 } exp_type_t;
 
+typedef enum
+{
+  GLOBAL_SORTING,
+  BUILD_TABLE,
+} exp_alg_dist;
+
 typedef struct
 {
   int rank;
@@ -41,6 +47,7 @@ typedef struct
   int seed;
   dist_type_t dist_type;
   exp_type_t exp_type;
+  exp_alg_dist alg_type;
   const char *device;
   double box_length;
   int major_r;
