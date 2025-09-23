@@ -190,7 +190,8 @@ plt.ylabel("Total time (s)")
 plt.title("CPU vs GPU — Total")
 plt.legend(); plt.grid(True, which="both", ls=":")
 savefig(results_dir, "total_time")
-\# %% [markdown]
+
+# %% [markdown]
 # ## Speedup vs processors — Distribution
 
 # %%
