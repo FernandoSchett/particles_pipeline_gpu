@@ -13,6 +13,7 @@ BASE_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 CPU_CORES_PER_NODE = 128
 GPUS_PER_NODE = 4
+BASE_EFF_NPROCS = 2  # baseline fixo para eficiência paralela (CPU e GPU)
 
 def prepare_data(csv_file, prefix, baseline_nprocs=None):
     results_dir = BASE_RESULTS_DIR / prefix
@@ -101,6 +102,7 @@ def savefig(results_dir, name):
     plt.savefig(results_dir / f"{name}.png", dpi=150)
     plt.show()
     plt.close()
+
 # %% [markdown]
 # ## Load data (choose weak or strong)
 
@@ -174,7 +176,6 @@ plt.ylabel("Generation time (s)")
 plt.title("CPU vs GPU — Generation")
 plt.legend(); plt.grid(True, which="both", ls=":")
 savefig(results_dir, "generation_time")
-
 
 # %% [markdown]
 # ## Mean time vs processors — Total
@@ -260,7 +261,6 @@ plt.title("Speedup vs CPU (Generation)")
 plt.legend(); plt.grid(True, which="both", ls=":")
 savefig(results_dir, "speedup_generation")
 
-
 # %% [markdown]
 # ## Speedup vs processors — Total
 
@@ -284,7 +284,6 @@ plt.title("Speedup vs CPU (Total)")
 plt.legend(); plt.grid(True, which="both", ls=":")
 savefig(results_dir, "speedup_total")
 
-
 # %% [markdown]
 # ## Speedup vs processors — Total
 
@@ -298,7 +297,7 @@ for pw in sorted(with_base["power"].unique()):
     g = with_base[with_base["power"] == pw]
     if g.empty: continue
     nref = g["cpu_base_nprocs"].iloc[0]
-    xs = sorted(g["num_procs"].unique())
+    xs = sorted(g["num_procs"].unique()])
     ys = [x/nref for x in xs]
     plt.plot(xs, ys, ls=":", lw=1.5, label=f"Ideal (p{pw}, N/Nref={nref})")
 plt.xscale("log")
@@ -308,60 +307,89 @@ plt.title("Speedup vs CPU (Total)")
 plt.legend(); plt.grid(True, which="both", ls=":")
 savefig(results_dir, "speedup_total")
 
-
 # %% [markdown]
-# ## Parallel efficiency — Total
+# ## Parallel efficiency — Total (baseline n=2)
 
 # %%
-ref = (summary.sort_values(["device","power","num_procs"])
-              .groupby(["device","power"],as_index=False)
-              .first())
-ref_total = ref.rename(columns={"num_procs":"n_ref","total_mean":"t_ref","total_std":"s_ref"})[["device","power","n_ref","t_ref","s_ref"]]
-eff_total = summary.merge(ref_total,on=["device","power"],how="inner")
-eff_total["eff_strong"] = (eff_total["t_ref"]*eff_total["n_ref"])/(eff_total["total_mean"]*eff_total["num_procs"])
-good = (eff_total["t_ref"]>0)&(eff_total["total_mean"]>0)&np.isfinite(eff_total["t_ref"])&np.isfinite(eff_total["total_mean"])
+ref2_total = (
+    summary[summary["num_procs"] == BASE_EFF_NPROCS]
+      .rename(columns={"num_procs":"n_ref","total_mean":"t_ref","total_std":"s_ref"})
+      [["device","power","n_ref","t_ref","s_ref"]]
+)
+
+eff_total = summary.merge(ref2_total, on=["device","power"], how="left")
+
+eff_total["eff_strong"] = np.nan
+good = (
+    eff_total["n_ref"].notna() &
+    (eff_total["t_ref"] > 0) & np.isfinite(eff_total["t_ref"]) &
+    (eff_total["total_mean"] > 0) & np.isfinite(eff_total["total_mean"])
+)
+eff_total.loc[good, "eff_strong"] = (
+    eff_total.loc[good, "t_ref"] * eff_total.loc[good, "n_ref"]
+) / (eff_total.loc[good, "total_mean"] * eff_total.loc[good, "num_procs"])
+
 eff_total["eff_strong_s"] = np.nan
-eff_total.loc[good,"eff_strong_s"] = eff_total.loc[good,"eff_strong"]*np.sqrt(
-    (eff_total.loc[good,"s_ref"]/eff_total["t_ref"])**2 + (eff_total.loc[good,"total_std"]/eff_total["total_mean"])**2
+eff_total.loc[good, "eff_strong_s"] = eff_total.loc[good, "eff_strong"] * np.sqrt(
+    (eff_total.loc[good, "s_ref"] / eff_total.loc[good, "t_ref"])**2 +
+    (eff_total.loc[good, "total_std"] / eff_total.loc[good, "total_mean"])**2
 )
 
 plt.figure(figsize=(8,5))
-for (dev,pw), g in eff_total.sort_values("num_procs").groupby(["device","power"]):
-    plt.errorbar(g["num_procs"], g["eff_strong"], yerr=g["eff_strong_s"], marker="o", capsize=4, label=f"{dev} (p{pw})")
+for (dev,pw), g in eff_total[good].sort_values("num_procs").groupby(["device","power"]):
+    plt.errorbar(g["num_procs"], g["eff_strong"], yerr=g["eff_strong_s"],
+                 marker="o", capsize=4, label=f"{dev} (p{pw})")
 plt.axhline(1.0, ls="--")
 plt.xscale("log")
 plt.xlabel("Number of processors")
-plt.ylabel("Parallel efficiency (strong)")
-plt.title("Parallel efficiency (Total)")
+plt.ylabel("Parallel efficiency (strong, baseline n=2)")
+plt.title("Parallel efficiency (Total) — baseline n=2")
 plt.legend(); plt.grid(True, which="both", ls=":")
-savefig(results_dir, "efficiency_total")
-
+savefig(results_dir, "efficiency_total_n2")
 
 # %% [markdown]
-# ## Parallel efficiency — Distribution / Generation / Splitters
+# ## Parallel efficiency — Distribution / Generation / Splitters (baseline n=2)
 
 # %%
 def plot_eff(mean_col, std_col, title, fname):
-    ref_x = ref.rename(columns={"num_procs":"n_ref", mean_col:"t_ref", std_col:"s_ref"})[["device","power","n_ref","t_ref","s_ref"]]
-    e2 = summary.merge(ref_x,on=["device","power"],how="inner")
-    e2["eff"] = (e2["t_ref"]*e2["n_ref"])/(e2[mean_col]*e2["num_procs"])
-    good = (e2["t_ref"]>0)&(e2[mean_col]>0)&np.isfinite(e2["t_ref"])&np.isfinite(e2[mean_col])
+    ref_x = (
+        summary[summary["num_procs"] == BASE_EFF_NPROCS]
+          .rename(columns={"num_procs":"n_ref", mean_col:"t_ref", std_col:"s_ref"})
+          [["device","power","n_ref","t_ref","s_ref"]]
+    )
+    e2 = summary.merge(ref_x, on=["device","power"], how="left")
+
+    e2["eff"] = np.nan
+    good = (
+        e2["n_ref"].notna() &
+        (e2["t_ref"] > 0) & np.isfinite(e2["t_ref"]) &
+        (e2[mean_col] > 0) & np.isfinite(e2[mean_col])
+    )
+    e2.loc[good, "eff"] = (
+        e2.loc[good, "t_ref"] * e2.loc[good, "n_ref"]
+    ) / (e2.loc[good, mean_col] * e2.loc[good, "num_procs"])
+
     e2["eff_s"] = np.nan
-    e2.loc[good,"eff_s"] = e2.loc[good,"eff"]*np.sqrt((e2.loc[good,"s_ref"]/e2.loc[good,"t_ref"])**2+(e2.loc[good,std_col]/e2.loc[good,mean_col])**2)
+    e2.loc[good, "eff_s"] = e2.loc[good, "eff"] * np.sqrt(
+        (e2.loc[good, "s_ref"] / e2.loc[good, "t_ref"])**2 +
+        (e2.loc[good, std_col] / e2.loc[good, mean_col])**2
+    )
+
     plt.figure(figsize=(8,5))
-    for (dev,pw), g in e2.sort_values("num_procs").groupby(["device","power"]):
-        plt.errorbar(g["num_procs"], g["eff"], yerr=g["eff_s"], marker="o", capsize=4, label=f"{dev} (p{pw})")
+    for (dev,pw), g in e2[good].sort_values("num_procs").groupby(["device","power"]):
+        plt.errorbar(g["num_procs"], g["eff"], yerr=g["eff_s"],
+                     marker="o", capsize=4, label=f"{dev} (p{pw})")
     plt.axhline(1.0, ls="--")
     plt.xscale("log")
     plt.xlabel("Number of processors")
-    plt.ylabel("Parallel efficiency (strong)")
-    plt.title(title)
+    plt.ylabel("Parallel efficiency (strong, baseline n=2)")
+    plt.title(f"{title} — baseline n=2")
     plt.legend(); plt.grid(True, which="both", ls=":")
     savefig(results_dir, fname)
 
-plot_eff("dist_mean","dist_std","Parallel efficiency — Distribution","efficiency_distribution")
-plot_eff("gen_mean","gen_std","Parallel efficiency — Generation","efficiency_generation")
-plot_eff("split_mean","split_std","Parallel efficiency — Splitters","efficiency_splitters")
+plot_eff("dist_mean","dist_std","Parallel efficiency — Distribution","efficiency_distribution_n2")
+plot_eff("gen_mean","gen_std","Parallel efficiency — Generation","efficiency_generation_n2")
+plot_eff("split_mean","split_std","Parallel efficiency — Splitters","efficiency_splitters_n2")
 
 # %% [markdown]
 # ## Time vs nodes — Distribution
@@ -437,5 +465,3 @@ plt.ylabel("Total time (s)")
 plt.title("Total time vs nodes used")
 plt.grid(True, ls=":"); plt.legend()
 savefig(results_dir, "time_vs_nodes_total")
-
-
