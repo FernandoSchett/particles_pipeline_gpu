@@ -44,10 +44,10 @@
     
 ## Next Steps:
 
-1. Strip Mining for more particles;
-2. Tree creation;
-4. Tests creation;
-3. Comparison with Article Distribution Alg[1] and T-digest statistics Alg;
+1. Tests creation;
+2. Strip Mining for more particles;
+3. Tree creation;
+4. Comparison with Article Distribution Alg[1] and T-digest statistics Alg;
 5. Add more space filling curves;
   
 ## References

@@ -300,67 +300,87 @@ void redistribute_by_splitters_gpu(t_particle **d_rank_array, int *lens, int *ca
             auto it = thrust::upper_bound(pol, first, last, probe, key_less{});
             pos[i + 1] = static_cast<long long>(it - first);
         }
-        pos[nprocs] = *lens;
+        pos[nprocs] = static_cast<long long>(*lens);
     }
 
-    std::vector<int> send_counts(nprocs, 0);
+    std::vector<long long> send_counts64(nprocs, 0);
     for (int r = 0; r < nprocs; ++r)
     {
         long long start = pos[r];
         long long end = pos[r + 1];
         long long c = end - start;
-        send_counts[r] = (c > 0) ? static_cast<int>(c) : 0;
+        send_counts64[r] = (c > 0) ? c : 0;
     }
 
-    std::vector<int> recv_counts(nprocs, 0);
-    MPI_Alltoall(send_counts.data(), 1, MPI_INT, recv_counts.data(), 1, MPI_INT, MPI_COMM_WORLD);
+    std::vector<long long> recv_counts64(nprocs, 0);
+    MPI_Alltoall(send_counts64.data(), 1, MPI_LONG_LONG,
+                 recv_counts64.data(), 1, MPI_LONG_LONG, MPI_COMM_WORLD);
 
-    std::vector<int> send_displs(nprocs, 0), recv_displs(nprocs, 0);
+    std::vector<long long> send_displs64(nprocs, 0), recv_displs64(nprocs, 0);
     for (int i = 1; i < nprocs; ++i)
     {
-        send_displs[i] = send_displs[i - 1] + send_counts[i - 1];
-        recv_displs[i] = recv_displs[i - 1] + recv_counts[i - 1];
+        send_displs64[i] = send_displs64[i - 1] + send_counts64[i - 1];
+        recv_displs64[i] = recv_displs64[i - 1] + recv_counts64[i - 1];
     }
-    const int total_send = send_displs.back() + send_counts.back();
-    const int total_recv = recv_displs.back() + recv_counts.back();
+    const long long total_recv64 = (nprocs ? recv_displs64.back() + recv_counts64.back() : 0);
 
+    const size_t elem_size = sizeof(t_particle);
     t_particle *d_tmp = nullptr;
-    if (total_recv > 0)
-        cudaMallocAsync(&d_tmp, (size_t)total_recv * sizeof(t_particle), stream);
-    else
-        cudaMallocAsync(&d_tmp, 1, stream);
+    size_t tmp_bytes = (total_recv64 > 0) ? (size_t)total_recv64 * elem_size : 1;
+    CUDA_RT_CALL(cudaMallocAsync((void**)&d_tmp, tmp_bytes, stream));
 
-    std::vector<int> send_counts_bytes(nprocs), recv_counts_bytes(nprocs),
-        send_displs_bytes(nprocs), recv_displs_bytes(nprocs);
-    for (int i = 0; i < nprocs; ++i)
+    CUDA_RT_CALL(cudaStreamSynchronize(stream));
+
+    const long long CHUNK_MAX_BYTES = (long long)INT_MAX - ((long long)INT_MAX % (long long)elem_size);
+
+    for (int p = 0; p < nprocs; ++p)
     {
-        send_counts_bytes[i] = send_counts[i] * (int)sizeof(t_particle);
-        recv_counts_bytes[i] = recv_counts[i] * (int)sizeof(t_particle);
-        send_displs_bytes[i] = send_displs[i] * (int)sizeof(t_particle);
-        recv_displs_bytes[i] = recv_displs[i] * (int)sizeof(t_particle);
+        long long to_send_e = send_counts64[p];
+        long long to_recv_e = recv_counts64[p];
+        long long s_off_e   = send_displs64[p];
+        long long r_off_e   = recv_displs64[p];
+
+        long long sent_e = 0, recvd_e = 0;
+        while (sent_e < to_send_e || recvd_e < to_recv_e)
+        {
+            long long send_chunk_e = std::min<long long>(to_send_e - sent_e, CHUNK_MAX_BYTES / (long long)elem_size);
+            long long recv_chunk_e = std::min<long long>(to_recv_e - recvd_e, CHUNK_MAX_BYTES / (long long)elem_size);
+
+            const void* sb = static_cast<const void*>((const char*)(*d_rank_array) + (s_off_e + sent_e) * elem_size);
+            void*       rb = static_cast<void*>((char*)d_tmp + (r_off_e + recvd_e) * elem_size);
+
+            int send_chunk_b = (int)(send_chunk_e * (long long)elem_size);
+            int recv_chunk_b = (int)(recv_chunk_e * (long long)elem_size);
+
+            MPI_Sendrecv(sb, send_chunk_b, MPI_BYTE, p, 0,
+                         rb, recv_chunk_b, MPI_BYTE, p, 0,
+                         MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+            sent_e  += send_chunk_e;
+            recvd_e += recv_chunk_e;
+        }
     }
 
-    cudaStreamSynchronize(stream);
-    MPI_Alltoallv(
-        *d_rank_array, send_counts_bytes.data(), send_displs_bytes.data(), MPI_BYTE,
-        d_tmp, recv_counts_bytes.data(), recv_displs_bytes.data(), MPI_BYTE,
-        MPI_COMM_WORLD);
-
-    if (total_recv > *capacity)
+    if (total_recv64 > (long long)*capacity)
     {
-        if (*d_rank_array)
-            cudaFree(*d_rank_array);
-        cudaMalloc(d_rank_array, (size_t)total_recv * sizeof(t_particle));
-        *capacity = total_recv;
+        if (total_recv64 > (long long)std::numeric_limits<int>::max())
+        {
+            fprintf(stderr, "ERROR: total_recv64 (%lld) exceeds INT_MAX; increase type of 'capacity'/'lens'.\n",
+                    (long long)total_recv64);
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+        if (*d_rank_array) cudaFree(*d_rank_array);
+        CUDA_RT_CALL(cudaMalloc((void**)d_rank_array, (size_t)total_recv64 * elem_size));
+        *capacity = (int)total_recv64;
     }
 
-    if (total_recv > 0)
-        cudaMemcpyAsync(*d_rank_array, d_tmp, (size_t)total_recv * sizeof(t_particle),
-                        cudaMemcpyDeviceToDevice, stream);
-    *lens = total_recv;
+    if (total_recv64 > 0)
+        CUDA_RT_CALL(cudaMemcpyAsync(*d_rank_array, d_tmp, (size_t)total_recv64 * elem_size,
+                                     cudaMemcpyDeviceToDevice, stream));
+    *lens = (int)total_recv64;
 
-    cudaStreamSynchronize(stream);
-    cudaFreeAsync(d_tmp, stream);
+    CUDA_RT_CALL(cudaStreamSynchronize(stream));
+    CUDA_RT_CALL(cudaFreeAsync(d_tmp, stream));
 
     DBG_IF({
         if (*lens > 0)

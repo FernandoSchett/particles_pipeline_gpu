@@ -8,7 +8,7 @@ TIMES=5
 SEED=69
 
 
-for mode in weak
+for mode in strong weak
 do
     LOGDIR="gpu_logdir_s${SEED}_M${mode}"
     
@@ -21,19 +21,19 @@ do
     rm  *.par
     rm  core.*
     
-    for pp in 3 8
+    for pp in 8 
     do
-        for ngpu in 1 2
+        for ngpu in 1 2 4 6 8 16 24 32 50 64 128 256 512
         do
             NODES=$(( (ngpu + GPU_PER_NODE - 1) / GPU_PER_NODE ))
-            echo "JobName=exp_pp${pp}_gpu${ngpu}_seed${SEED}_${mode}, Mode=$mode, pp=$pp, ngpu=$ngpu, nodes=$NODES, partition=$PARTITION, time:00:30:00"
+            echo "JobName=exp_pp${pp}_gpu${ngpu}_seed${SEED}_${mode}, Mode=$mode, pp=$pp, ngpu=$ngpu, nodes=$NODES, partition=$PARTITION, time:05:00:00"
             
             sbatch \
                 --nodes=$NODES \
                 --ntasks=$ngpu \
                 --cpus-per-task=1 \
                 --gpus-per-task=1 \
-                --time=00:29:00 \
+                --time=05:00:00 \
                 --partition=$PARTITION \
                 --account=gsp25 \
                 --job-name=exp_pp${pp}_gpu${ngpu}_seed${SEED}_M${mode} \
