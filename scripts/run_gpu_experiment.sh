@@ -11,6 +11,7 @@ mode=$6
 
 echo "Running with echo $CUDA_VISIBLE_DEVICES gpus, $times times"
 
+# TO DO: Make it run with differnts seeds.
 for i in $(seq 1 $times);
 do
     #SEED=$((BASE_SEED + i))
