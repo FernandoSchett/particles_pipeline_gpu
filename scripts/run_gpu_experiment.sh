@@ -13,6 +13,7 @@ echo "Running with echo $CUDA_VISIBLE_DEVICES gpus, $times times"
 
 for i in $(seq 1 $times);
 do
+    #SEED=$((BASE_SEED + i))
     echo "Execution #$i at $distribuition dist and $power_particles power particles $mode mode (SEED: $5)..."
-      srun -n $nprocs ../build/src/gpu_mpi_p_sfc_exe $distribuition $power_particles $SEED $mode
+    srun -n $nprocs ../build/src/gpu_mpi_p_sfc_exe $distribuition $power_particles $SEED $mode
 done

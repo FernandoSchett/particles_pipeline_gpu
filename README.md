@@ -1,4 +1,4 @@
-# JUN + NANDO COOL MERGING ALGORITH CODE.
+# JUN + NANDO COOL MERGING ALGORITHM CODE.
 
 ## How to run:
 
@@ -10,20 +10,21 @@
 
 3. (OPTIONAL) If in a supercomputer:
 
-         source scripts/load_modules.sh
-   
+        source scripts/load_modules_cpu.sh
+
+        source scripts/load_modules_gpu.sh
+
 4. Compile:
 
          sh scripts/compile.sh
 
-
 5.  Run:
 
-        ./build./src/p_sfc_exe <distribution_name> <power_particles>
-    
+        mpirun -np <number_of_processes> ./build./src/p_sfc_exe <distribution_name> <power_particles> <seed> <mode>
+        
         ./build./src/gpu_mpi_p_sfc_exe <distribution_name> <power_particles>
    
-7. See Results (Only if power_particles < 4):
+6. See Results (Only if power_particles < 4):
 
             source scripts/setup_py_env.sh
             python3 visualize.py

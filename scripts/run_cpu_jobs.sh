@@ -21,10 +21,11 @@ do
     mkdir -p "$LOGDIR"
 
     rm  *.par
+    rm  core.*
     
     for pp in 8
     do
-        for np in 1 2 4 6 8 16 24 32 50 64 128 256
+        for np in 1 2 4 6 8 16 24 32 50 64 128 256 512
         do
             NODES=$(( (np + CORES_PER_NODE - 1) / CORES_PER_NODE ))
             echo "JobName=exp_pp${pp}_cpu${np}_seed${SEED}_${mode}, Mode=$mode, pp=$pp, np=$np, nodes=$NODES, partition=$PARTITION, time=05:00:00"   
