@@ -47,7 +47,7 @@
 1. Strip Mining for more particles;
 2. Tree creation;
 4. Tests creation;
-3. Comparison with Article Distribution Alg and T-digest statistics Alg;
+3. Comparison with Article Distribution Alg[1] and T-digest statistics Alg;
 5. Add more space filling curves;
   
 ## References
