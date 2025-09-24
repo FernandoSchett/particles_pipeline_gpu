@@ -22,7 +22,7 @@
 
         mpirun -np <number_of_processes> ./build./src/p_sfc_exe <distribution_name> <power_particles> <seed> <mode>
         
-        ./build./src/gpu_mpi_p_sfc_exe <distribution_name> <power_particles>
+        mpirun -np <number_of_processes> ./build./src/gpu_mpi_p_sfc_exe <distribution_name> <power_particles> <seed> <mode>
    
 6. See Results (Only if power_particles < 4):
 
@@ -41,3 +41,15 @@
     - CMake
     - Boost
     - CUDA
+    
+## Next Steps:
+
+1. Strip Mining for more particles;
+2. Tree creation;
+4. Tests creation;
+3. Comparison with Article Distribution Alg and T-digest statistics Alg;
+5. Add more space filling curves;
+  
+## References
+
+[1] TSUZUKI, S.; AOKI, T. Effective Dynamic Load Balance using Space-Filling Curves for Large-scale SPH Simulations on GPU-rich Supercomputers. In: WORKSHOP ON LATEST ADVANCES IN SCALABLE ALGORITHMS FOR LARGE-SCALE SYSTEMS (ScalA), 7., 2016, Salt Lake City, UT. Proceedings… Piscataway, NJ: IEEE, 2016. p. 1–8. DOI: 10.1109/ScalA.2016.5.
