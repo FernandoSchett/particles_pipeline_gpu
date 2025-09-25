@@ -23,6 +23,7 @@
 #include <cstdio>
 
 #include "particle_types.hpp"
+#include "file_handling.hpp"
 #include "logging.hpp"
 
 // GPU Kernels
@@ -49,4 +50,7 @@ void discover_splitters_gpu(const t_particle *d_rank_array, int lens,
                             cudaStream_t stream,
                             std::vector<unsigned long long> &splitters_out);
 void redistribute_by_splitters_gpu(t_particle **d_rank_array, int *lens, int *capacity, const std::vector<unsigned long long> &splitters, cudaStream_t stream);
+
+void write_par_gpu(const ExecConfig &cfg, t_particle *d_rank_array, int lens, cudaStream_t gpu_stream);
+
 #endif

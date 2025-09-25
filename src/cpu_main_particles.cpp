@@ -114,19 +114,14 @@ int main(int argc, char **argv)
         break;
 
     case BUILD_TABLE:
-        // adicionar implementação futura aqui, se necessário
+
         t2 = t1;
         t3 = t1;
         break;
     }
 
     if (cfg.power < 4)
-    {
-        char filename[128];
-        std::sprintf(filename, "particle_file_cpu_n%d_total%lld.par", cfg.nprocs, cfg.total_particles);
-        MPI_Allgather(&cfg.length_per_rank, 1, MPI_INT, length_vector, 1, MPI_INT, MPI_COMM_WORLD);
-        parallel_write_to_file(rank_array, length_vector, filename);
-    }
+        write_par_cpu(cfg, rank_array, length_vector);
 
     if (cfg.rank == 0)
     {

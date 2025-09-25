@@ -67,7 +67,7 @@ int box_distribution(t_particle **particle_array, int count, double box_length, 
         (*particle_array)[i].coord[2] = uz * box_length;
     }
     return 0;
-     }
+}
 
 int torus_distribution(t_particle **particle_array, int count, double major_r, double minor_r, double box_length, int seed)
 {
@@ -86,13 +86,13 @@ int torus_distribution(t_particle **particle_array, int count, double major_r, d
         double u2 = r123::u01<double>(rnum.v[2]);
 
         double theta = TWO_PI * u0;
-        double phi   = TWO_PI * u1;
-        double r     = minor_r * std::sqrt(u2);
+        double phi = TWO_PI * u1;
+        double r = minor_r * std::sqrt(u2);
 
         double cphi = std::cos(phi);
         double sphi = std::sin(phi);
-        double cth  = std::cos(theta);
-        double sth  = std::sin(theta);
+        double cth = std::cos(theta);
+        double sth = std::sin(theta);
 
         double Rplus = major_r + r * cphi;
 
@@ -360,4 +360,15 @@ int redistribute_by_splitters_cpu(t_particle **particles,
 
     DBG_PRINT("Rank %d, Number Particles: %d\n", rank, *particle_vector_size);
     return 0;
+}
+
+void write_par_cpu(const ExecConfig &cfg,
+                   t_particle *rank_array,
+                   int *length_vector)
+{
+
+    char filename[128];
+    std::sprintf(filename, "particle_file_cpu_n%d_total%lld.par", cfg.nprocs, cfg.total_particles);
+    MPI_Allgather(&cfg.length_per_rank, 1, MPI_INT, length_vector, 1, MPI_INT, MPI_COMM_WORLD);
+    parallel_write_to_file(rank_array, length_vector, filename);
 }

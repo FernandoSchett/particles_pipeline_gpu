@@ -327,7 +327,7 @@ void redistribute_by_splitters_gpu(t_particle **d_rank_array, int *lens, int *ca
     const size_t elem_size = sizeof(t_particle);
     t_particle *d_tmp = nullptr;
     size_t tmp_bytes = (total_recv64 > 0) ? (size_t)total_recv64 * elem_size : 1;
-    CUDA_RT_CALL(cudaMallocAsync((void**)&d_tmp, tmp_bytes, stream));
+    CUDA_RT_CALL(cudaMallocAsync((void **)&d_tmp, tmp_bytes, stream));
 
     CUDA_RT_CALL(cudaStreamSynchronize(stream));
 
@@ -337,8 +337,8 @@ void redistribute_by_splitters_gpu(t_particle **d_rank_array, int *lens, int *ca
     {
         long long to_send_e = send_counts64[p];
         long long to_recv_e = recv_counts64[p];
-        long long s_off_e   = send_displs64[p];
-        long long r_off_e   = recv_displs64[p];
+        long long s_off_e = send_displs64[p];
+        long long r_off_e = recv_displs64[p];
 
         long long sent_e = 0, recvd_e = 0;
         while (sent_e < to_send_e || recvd_e < to_recv_e)
@@ -346,8 +346,8 @@ void redistribute_by_splitters_gpu(t_particle **d_rank_array, int *lens, int *ca
             long long send_chunk_e = std::min<long long>(to_send_e - sent_e, CHUNK_MAX_BYTES / (long long)elem_size);
             long long recv_chunk_e = std::min<long long>(to_recv_e - recvd_e, CHUNK_MAX_BYTES / (long long)elem_size);
 
-            const void* sb = static_cast<const void*>((const char*)(*d_rank_array) + (s_off_e + sent_e) * elem_size);
-            void*       rb = static_cast<void*>((char*)d_tmp + (r_off_e + recvd_e) * elem_size);
+            const void *sb = static_cast<const void *>((const char *)(*d_rank_array) + (s_off_e + sent_e) * elem_size);
+            void *rb = static_cast<void *>((char *)d_tmp + (r_off_e + recvd_e) * elem_size);
 
             int send_chunk_b = (int)(send_chunk_e * (long long)elem_size);
             int recv_chunk_b = (int)(recv_chunk_e * (long long)elem_size);
@@ -356,7 +356,7 @@ void redistribute_by_splitters_gpu(t_particle **d_rank_array, int *lens, int *ca
                          rb, recv_chunk_b, MPI_BYTE, p, 0,
                          MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-            sent_e  += send_chunk_e;
+            sent_e += send_chunk_e;
             recvd_e += recv_chunk_e;
         }
     }
@@ -369,8 +369,9 @@ void redistribute_by_splitters_gpu(t_particle **d_rank_array, int *lens, int *ca
                     (long long)total_recv64);
             MPI_Abort(MPI_COMM_WORLD, 1);
         }
-        if (*d_rank_array) cudaFree(*d_rank_array);
-        CUDA_RT_CALL(cudaMalloc((void**)d_rank_array, (size_t)total_recv64 * elem_size));
+        if (*d_rank_array)
+            cudaFree(*d_rank_array);
+        CUDA_RT_CALL(cudaMalloc((void **)d_rank_array, (size_t)total_recv64 * elem_size));
         *capacity = (int)total_recv64;
     }
 
@@ -393,4 +394,77 @@ void redistribute_by_splitters_gpu(t_particle **d_rank_array, int *lens, int *ca
     });
 
     DBG_PRINT("After disrank %d: %d\n", rank, *lens);
+}
+
+void write_par_gpu(const ExecConfig &cfg,
+                   t_particle *d_rank_array,
+                   int lens,
+                   cudaStream_t gpu_stream)
+{
+    t_particle *h_host_array = nullptr;
+
+    cudaMallocHost(&h_host_array, (size_t)cfg.length_per_rank * sizeof(t_particle));
+    if (h_host_array)
+    {
+        cudaFreeHost(h_host_array);
+        h_host_array = nullptr;
+    }
+
+    const size_t bytes = (size_t)lens * sizeof(t_particle);
+    if (lens > 0)
+    {
+        cudaMallocHost(&h_host_array, bytes);
+        cudaMemcpyAsync(h_host_array, d_rank_array, bytes, cudaMemcpyDeviceToHost, gpu_stream);
+    }
+
+    cudaStreamSynchronize(gpu_stream);
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    std::vector<int> recv_lens;
+    if (cfg.rank == 0)
+        recv_lens.resize(cfg.nprocs);
+    MPI_Gather(&lens, 1, MPI_INT, cfg.rank == 0 ? recv_lens.data() : nullptr, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    std::vector<int> recv_counts, recv_displs;
+    size_t total_count = 0;
+    if (cfg.rank == 0)
+    {
+        recv_counts.resize(cfg.nprocs);
+        recv_displs.resize(cfg.nprocs);
+        for (int i = 0; i < cfg.nprocs; ++i)
+        {
+            recv_counts[i] = recv_lens[i] * (int)sizeof(t_particle);
+        }
+        recv_displs[0] = 0;
+        for (int i = 1; i < cfg.nprocs; ++i)
+            recv_displs[i] = recv_displs[i - 1] + recv_counts[i - 1];
+        total_count = (size_t)recv_displs.back() + (size_t)recv_counts.back();
+    }
+
+    std::vector<unsigned char> gather_buf(cfg.rank == 0 ? total_count : 0);
+    MPI_Gatherv(d_rank_array, lens * (int)sizeof(t_particle), MPI_BYTE,
+                cfg.rank == 0 ? gather_buf.data() : nullptr,
+                cfg.rank == 0 ? recv_counts.data() : nullptr,
+                cfg.rank == 0 ? recv_displs.data() : nullptr,
+                MPI_BYTE, 0, MPI_COMM_WORLD);
+
+    if (cfg.rank == 0)
+    {
+        if (cfg.power < 4)
+        {
+            char filename[128];
+            std::sprintf(filename, "particle_file_gpu_n%d_total%lld.par", cfg.nprocs, cfg.total_particles);
+            std::vector<t_particle *> host_ptrs(cfg.nprocs, nullptr);
+            for (int i = 0; i < cfg.nprocs; ++i)
+                host_ptrs[i] = reinterpret_cast<t_particle *>(gather_buf.data() + recv_displs[i]);
+            int rc = concat_and_serial_write(host_ptrs.data(), recv_lens.data(), cfg.nprocs, filename);
+            if (rc != 0)
+            {
+                std::cerr << "Error at writing file, rc=" << rc << "\n";
+            }
+        }
+    }
+
+    if (h_host_array)
+        cudaFreeHost(h_host_array);
 }

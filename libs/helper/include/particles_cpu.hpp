@@ -16,6 +16,7 @@
 
 #include "particle_types.hpp"
 #include "logging.hpp"
+#include "file_handling.hpp"
 
 extern MPI_Datatype MPI_particle;
 int register_MPI_Particle(MPI_Datatype *MPI_Particle);
@@ -29,4 +30,6 @@ int generate_particles_keys(t_particle *particle_array, int count, double box_le
 void discover_splitters_cpu(t_particle *particles, int local_n, std::vector<unsigned long long> &splitters_out);
 
 int redistribute_by_splitters_cpu(t_particle **particles, int *particle_vector_size, const std::vector<unsigned long long> &splitters);
+
+void write_par_cpu(const ExecConfig &cfg, t_particle *rank_array, int *length_vector);
 #endif
