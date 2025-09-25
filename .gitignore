@@ -6,6 +6,5 @@ scripts/*.par
 .ipynb_checkpoints/
 scripts/*_logdir*/
 scripts/*jwc
-scripts/
 scripts/core.jwb*.juwels.*
 results/
