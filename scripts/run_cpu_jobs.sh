@@ -20,8 +20,8 @@ do
     
     mkdir -p "$LOGDIR"
 
-    rm  *.par
-    rm  core.*
+    rm  *.par || true
+    rm  core.* || true
     
     for pp in 8
     do
