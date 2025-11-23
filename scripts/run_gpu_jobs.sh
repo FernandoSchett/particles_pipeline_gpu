@@ -3,12 +3,12 @@
 cd "$(dirname "$0")"
 
 GPU_PER_NODE=4 
-PARTITION=booster
-TIMES=5
+PARTITION=dc-gpu-devel 
+TIMES=1
 SEED=69
 
 
-for mode in strong weak
+for mode in weak
 do
     LOGDIR="gpu_logdir_s${SEED}_M${mode}"
     
@@ -21,9 +21,9 @@ do
     rm  *.par || true
     rm  core.* || true
     
-    for pp in 8 
+    for pp in 3
     do
-        for ngpu in 1 2 4 6 8 16 24 32 50 64 128 256 512
+        for ngpu in 1 2
         do
             NODES=$(( (ngpu + GPU_PER_NODE - 1) / GPU_PER_NODE ))
             echo "JobName=exp_pp${pp}_gpu${ngpu}_seed${SEED}_${mode}, Mode=$mode, pp=$pp, ngpu=$ngpu, nodes=$NODES, partition=$PARTITION, time:05:00:00"
@@ -33,9 +33,9 @@ do
                 --ntasks=$ngpu \
                 --cpus-per-task=1 \
                 --gpus-per-task=1 \
-                --time=05:00:00 \
+                --time=00:10:00 \
                 --partition=$PARTITION \
-                --account=gsp25 \
+                --account=pepcexa \
                 --job-name=exp_pp${pp}_gpu${ngpu}_seed${SEED}_M${mode} \
                 --output=${LOGDIR}/exp_pp${pp}_gpu${ngpu}_S${SEED}_M${mode}%j.out \
                 --error=${LOGDIR}/exp_pp${pp}_gpu${ngpu}_S${SEED}_M${mode}%j.err \

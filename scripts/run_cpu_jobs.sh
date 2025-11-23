@@ -10,7 +10,7 @@ TIMES=5
 SEED=69
 
 
-for mode in weak strong 
+for mode in weak 
 do
     LOGDIR="cpu_logdir_s${SEED}_M${mode}"
     
@@ -25,7 +25,7 @@ do
     
     for pp in 3
     do
-        for np in 1 2 
+        for np in 1 2 8
         do
             NODES=$(( (np + CORES_PER_NODE - 1) / CORES_PER_NODE ))
             echo "JobName=exp_pp${pp}_cpu${np}_seed${SEED}_${mode}, Mode=$mode, pp=$pp, np=$np, nodes=$NODES, partition=$PARTITION, time=05:00:00"   
@@ -34,9 +34,9 @@ do
                 --nodes=$NODES \
                 --ntasks=$np \
                 --cpus-per-task=1 \
-                --time=05:00:00 \
+                --time=00:10:00 \
                 --partition=$PARTITION \
-                --account=gsp25 \
+                --account=pepcexa \
                 --job-name=exp_pp${pp}_np${np}_seed${SEED}_M${mode} \
                 --output=${LOGDIR}/exp_pp${pp}_cpu${np}_S${SEED}_M${mode}%j.out \
                 --error=${LOGDIR}/exp_pp${pp}_cpu${np}_S${SEED}_M${mode}%j.err \
