@@ -1,5 +1,5 @@
-#ifndef FILEHANFLING_H
-#define FILEHANFLING_H
+#ifndef P_SFC_FILE_HANDLING_HPP
+#define P_SFC_FILE_HANDLING_HPP
 
 #include <mpi.h>
 #include <vector>
@@ -14,6 +14,7 @@
 #include "logging.hpp"
 
 extern MPI_Datatype MPI_particle;
+int register_MPI_Particle(MPI_Datatype *MPI_Particle);
 
 int parallel_write_to_file(t_particle *particle_array, int *count, char *filename);
 int serial_write_to_file(t_particle *particle_array, int count, char *filename);

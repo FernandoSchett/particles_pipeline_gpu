@@ -1,6 +1,5 @@
 # libs/helper/CMakeLists.txt
 
-
 # Library Dependecies
 find_package(Boost REQUIRED)
 find_package(MPI REQUIRED COMPONENTS CXX)

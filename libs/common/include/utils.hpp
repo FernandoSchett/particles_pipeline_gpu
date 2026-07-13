@@ -1,5 +1,5 @@
-#ifndef PUTILS_H
-#define PUTILS_H
+#ifndef P_SFC_UTILS_HPP
+#define P_SFC_UTILS_HPP
 
 #include <cstdint>
 #include <cstdio>

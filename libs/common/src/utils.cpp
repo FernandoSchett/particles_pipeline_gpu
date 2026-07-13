@@ -1,4 +1,3 @@
-// utils.cpp
 #include "utils.hpp"
 #include <cstdio>
 #include <ctime>

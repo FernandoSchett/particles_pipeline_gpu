@@ -1,5 +1,7 @@
 #include "particles_gpu.hcu"
 
+// GPU particle generation and redistribution.
+
 #define CUDA_RT_CALL(call)                                                                  \
     {                                                                                       \
         cudaError_t cudaStatus = call;                                                      \

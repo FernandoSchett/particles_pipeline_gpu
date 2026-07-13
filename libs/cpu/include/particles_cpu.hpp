@@ -1,5 +1,5 @@
-#ifndef PARTICLESCPU_H
-#define PARTICLESCPU_H
+#ifndef P_SFC_PARTICLES_CPU_HPP
+#define P_SFC_PARTICLES_CPU_HPP
 
 #include <array>
 #include <vector>
@@ -17,9 +17,6 @@
 #include "particle_types.hpp"
 #include "logging.hpp"
 #include "file_handling.hpp"
-
-extern MPI_Datatype MPI_particle;
-int register_MPI_Particle(MPI_Datatype *MPI_Particle);
 
 int box_distribution(t_particle **particle_array, int count, double box_length, int seed);
 int torus_distribution(t_particle **particle_array, int count, double major_r, double minor_r, double box_length, int seed);

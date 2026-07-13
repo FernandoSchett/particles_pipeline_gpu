@@ -1,4 +1,5 @@
 #pragma once
+
 #include <cstdio>
 
 #ifdef ENABLE_DEBUG_LOG
@@ -18,4 +19,3 @@
 #define DBG_RANK_PRINT(...) do { } while (0)
 
 #endif
-

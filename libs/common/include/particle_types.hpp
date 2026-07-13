@@ -1,5 +1,5 @@
-#ifndef PARTICLESTYPES_H
-#define PARTICLESTYPES_H
+#ifndef P_SFC_PARTICLE_TYPES_HPP
+#define P_SFC_PARTICLE_TYPES_HPP
 
 #include <cstdint>
 #include <cstddef>

@@ -1,52 +1,6 @@
 #include "particles_cpu.hpp"
 
-MPI_Datatype MPI_particle;
-int register_MPI_Particle(MPI_Datatype *MPI_Particle)
-{
-    int blocklengths[NPROPS_PARTICLE] = {1, 1, 3};
-    MPI_Datatype array_types[NPROPS_PARTICLE] = {MPI_INT, MPI_LONG_LONG_INT, MPI_DOUBLE};
-    t_particle dummy_particle[2];
-    MPI_Aint address[NPROPS_PARTICLE + 1], displacements[NPROPS_PARTICLE], extent_add;
-    int type_size;
-
-    MPI_Get_address(&dummy_particle[0], &address[0]);
-    MPI_Get_address(&dummy_particle[0].mpi_rank, &address[1]);
-    MPI_Get_address(&dummy_particle[0].key, &address[2]);
-    MPI_Get_address(&dummy_particle[0].coord, &address[3]);
-
-    for (int i = 0; i < NPROPS_PARTICLE; i++)
-        displacements[i] = address[i + 1] - address[0];
-
-    MPI_Datatype tmp;
-    MPI_Type_create_struct(NPROPS_PARTICLE, blocklengths, displacements, array_types, &tmp);
-
-    MPI_Get_address(&dummy_particle[1], &extent_add);
-    extent_add = extent_add - address[0];
-
-    MPI_Type_create_resized(tmp, 0, extent_add, MPI_Particle);
-    MPI_Type_free(&tmp);
-
-    MPI_Type_size(*MPI_Particle, &type_size);
-    MPI_Type_commit(MPI_Particle);
-    return 0;
-}
-int allocate_particle(t_particle **particle_array, int count)
-{
-    int p_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &p_rank);
-    (*particle_array) = (t_particle *)malloc(count * sizeof(t_particle));
-
-    for (int i = 0; i < count; i++)
-    {
-        (*particle_array)[i].mpi_rank = p_rank;
-        (*particle_array)[i].key = 0;
-        (*particle_array)[i].coord[0] = 0.0;
-        (*particle_array)[i].coord[1] = 0.0;
-        (*particle_array)[i].coord[2] = 0.0;
-    }
-
-    return 0;
-}
+// CPU particle generation and redistribution.
 
 int box_distribution(t_particle **particle_array, int count, double box_length, int seed)
 {
