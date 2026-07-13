@@ -8,3 +8,4 @@ scripts/*_logdir*/
 scripts/*jwc
 scripts/core.jwb*.juwels.*
 .venv/
+__pycache__/

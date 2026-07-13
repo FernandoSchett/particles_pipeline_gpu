@@ -27,7 +27,7 @@
 6. See Results (Only if power_particles < 4):
 
             source scripts/setup_py_env.sh
-            python3 visualize.py
+            python3 py_apps/visualise.py
  
 ## How reproduce the experiments:
 

@@ -2,7 +2,10 @@ import numpy as np
 import struct
 import matplotlib.pyplot as plt
 from matplotlib.widgets import CheckButtons
-import os
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+BUILD_DIR = PROJECT_ROOT / "build"
 
 def read_binary(filename):
     with open(filename, "rb") as f:
@@ -25,8 +28,7 @@ def read_binary(filename):
 
     return particle_count, rank_array, coord_array
 
-files = sorted(f for f in os.listdir("./build") if f.startswith("particle_file"))
-particle_files = [os.path.join("./build", f) for f in files]
+particle_files = sorted(BUILD_DIR.glob("particle_file*"))
 
 for par_file in particle_files:
     particle_count, rank_array, coord_array = read_binary(par_file)
@@ -34,7 +36,7 @@ for par_file in particle_files:
 
     fig = plt.figure(figsize=(10,6))
     ax = fig.add_subplot(121, projection='3d')
-    ax.set_title(os.path.basename(par_file))
+    ax.set_title(par_file.name)
     ax.set_box_aspect((np.ptp(coord_array[:,0]), np.ptp(coord_array[:,1]), np.ptp(coord_array[:,2])) if particle_count > 0 else (1,1,1))
 
     cm = plt.get_cmap('plasma')

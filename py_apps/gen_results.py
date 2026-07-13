@@ -8,7 +8,8 @@ import numpy as np
 from pathlib import Path
 import math
 
-BASE_RESULTS_DIR = Path("results")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+BASE_RESULTS_DIR = PROJECT_ROOT / "results"
 BASE_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 CPU_CORES_PER_NODE = 128
@@ -350,5 +351,6 @@ def run_all(csv_file, prefix):
         plot_efficiency_vs_axis(with_base, "num_procs", file_tag, base_tag, results_dir, prefix)
 
 # %%
-run_all("results_weak.csv", "weak")
-run_all("results_strong.csv", "strong")
+if __name__ == "__main__":
+    run_all(PROJECT_ROOT / "results_weak.csv", "weak")
+    run_all(PROJECT_ROOT / "results_strong.csv", "strong")
