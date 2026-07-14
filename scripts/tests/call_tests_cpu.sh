@@ -4,7 +4,7 @@ cd "$(dirname "$0")"
 
 # Config
 PARTITION="${PARTITION:-dc-cpu}"
-ACCOUNT="${ACCOUNT:-gsp25}"
+ACCOUNT="${ACCOUNT:-pepcexa}"
 TIME="${TIME:-00:20:00}"
 
 rm -f ./*.par core.* || true
