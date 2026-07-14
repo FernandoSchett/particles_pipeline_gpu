@@ -3,18 +3,28 @@ set -euo pipefail
 shopt -s nullglob
 
 cd "$(dirname "$0")"
+source ../load_modules_cpu.sh
 
 DISTS=(box)
 SEEDS=(67)
-PP="${PP:-4}"
+PP="${PP:-3}"
 MODE="${MODE:-weak}"
 NP_LIST=(1 2 4 128 256)
+CPU_PER_NODE="${CPU_PER_NODE:-128}"
 
 for dist in "${DISTS[@]}"; do
   for seed in "${SEEDS[@]}"; do
     for np in "${NP_LIST[@]}"; do
-      echo "[RUN] dist=$dist pp=$PP seed=$seed mode=$MODE np=$np"
-      srun -n "$np" ../../build/src/p_sfc_exe "$dist" "$PP" "$seed" "$MODE"
+      nodes=$(( (np + CPU_PER_NODE - 1) / CPU_PER_NODE ))
+      tasks_per_node=$(( np < CPU_PER_NODE ? np : CPU_PER_NODE ))
+
+      echo "[RUN][CPU] dist=$dist pp=$PP seed=$seed mode=$MODE np=$np nodes=$nodes"
+      srun \
+        --nodes="$nodes" \
+        --ntasks="$np" \
+        --ntasks-per-node="$tasks_per_node" \
+        --cpus-per-task=1 \
+        ../../build/src/p_sfc_exe "$dist" "$PP" "$seed" "$MODE"
 
       generated=(particle_file_cpu_n"${np}"_*.par)
       if ((${#generated[@]} != 1)); then
