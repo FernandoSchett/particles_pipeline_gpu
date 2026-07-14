@@ -3,8 +3,8 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 # Config
-PARTITION="${GPU_PARTITION:-booster}"
-ACCOUNT="${ACCOUNT:-gsp25}"
+PARTITION="${GPU_PARTITION:-dc-gpu}"
+ACCOUNT="${ACCOUNT:-pepcexa}"
 TIME="${GPU_TIME:-00:20:00}"
 MAX_NP="${GPU_MAX_NP:-8}"
 GPU_PER_NODE="${GPU_PER_NODE:-4}"

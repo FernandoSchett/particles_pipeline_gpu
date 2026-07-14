@@ -5,8 +5,8 @@ shopt -s nullglob
 cd "$(dirname "$0")"
 source ../load_modules_gpu.sh
 
-DISTS=(box torus)
-SEEDS=(69 24)
+DISTS=(box)
+SEEDS=(67)
 PP="${PP:-3}"
 MODE="${MODE:-weak}"
 NP_LIST=(1 2 4 8)

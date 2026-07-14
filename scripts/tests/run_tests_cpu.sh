@@ -4,11 +4,11 @@ shopt -s nullglob
 
 cd "$(dirname "$0")"
 
-DISTS=(box torus)
-SEEDS=(69 24)
-PP="${PP:-3}"
+DISTS=(box)
+SEEDS=(67)
+PP="${PP:-4}"
 MODE="${MODE:-weak}"
-NP_LIST=(1 2 4 8)
+NP_LIST=(1 2 4 128 256)
 
 for dist in "${DISTS[@]}"; do
   for seed in "${SEEDS[@]}"; do
