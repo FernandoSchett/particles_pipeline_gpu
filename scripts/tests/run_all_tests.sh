@@ -6,6 +6,10 @@ SCRIPTS_DIR="$(dirname "$TEST_DIR")"
 PROJECT_ROOT="$(dirname "$SCRIPTS_DIR")"
 PYTHON="${PYTHON:-python3}"
 
+cd "$PROJECT_ROOT"
+rm -rf build
+mkdir -p build
+
 cd "$SCRIPTS_DIR"
 sh ./compile.sh
 
