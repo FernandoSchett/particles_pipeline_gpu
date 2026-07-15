@@ -23,6 +23,7 @@ int torus_distribution(t_particle **particle_array, int count, double major_r, d
 
 int allocate_particle(t_particle **particle_array, int count);
 int generate_particles_keys(t_particle *particle_array, int count, double box_length);
+void sort_particles_by_key_cpu(t_particle *particles, int count);
 
 void discover_splitters_cpu(t_particle *particles, int local_n, std::vector<unsigned long long> &splitters_out);
 

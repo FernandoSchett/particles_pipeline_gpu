@@ -158,6 +158,15 @@ struct particle_rightshift
     }
 };
 
+void sort_particles_by_key_cpu(t_particle *particles, int count)
+{
+    if (count < 2)
+        return;
+
+    boost::sort::spreadsort::integer_sort(
+        particles, particles + count, particle_rightshift{}, particle_less{});
+}
+
 void discover_splitters_cpu(t_particle *particles, int local_n,
                             std::vector<unsigned long long> &splitters_out)
 {
@@ -165,8 +174,7 @@ void discover_splitters_cpu(t_particle *particles, int local_n,
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
 
-    boost::sort::spreadsort::integer_sort(
-        particles, particles + local_n, particle_rightshift{}, particle_less{});
+    sort_particles_by_key_cpu(particles, local_n);
 
     long long N_local = local_n, N_global = 0;
     MPI_Allreduce(&N_local, &N_global, 1, MPI_LONG_LONG_INT, MPI_SUM, MPI_COMM_WORLD);

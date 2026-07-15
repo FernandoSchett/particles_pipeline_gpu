@@ -12,6 +12,7 @@
 
 #include "particle_types.hpp"
 #include "particles_cpu.hpp"
+#include "hashed_octree.hpp"
 #include "file_handling.hpp"
 #include "utils.hpp"
 #include "logging.hpp"
@@ -68,6 +69,7 @@ int main(int argc, char **argv)
     parse_args(argc, argv, cfg);
 
     std::vector<unsigned long long> splitters;
+    HashedOctree local_tree;
     register_MPI_Particle(&MPI_particle);
     int *length_vector = (int *)std::malloc(cfg.nprocs * sizeof(int));
     t_particle *rank_array = nullptr;
@@ -110,7 +112,10 @@ int main(int argc, char **argv)
     switch (cfg.alg_type)
     {
     case GLOBAL_SORTING:
-        if (cfg.nprocs > 1)
+    case BUILD_TABLE:
+    {
+        const bool build_table = cfg.alg_type == BUILD_TABLE;
+        if (cfg.nprocs > 1 || build_table)
             discover_splitters_cpu(rank_array, cfg.length_per_rank, splitters);
 
         MPI_Barrier(MPI_COMM_WORLD);
@@ -121,13 +126,29 @@ int main(int argc, char **argv)
 
         MPI_Barrier(MPI_COMM_WORLD);
         t3 = MPI_Wtime();
-        break;
 
-    case BUILD_TABLE:
+        if (build_table)
+        {
+            sort_particles_by_key_cpu(rank_array, cfg.length_per_rank);
+            const int tree_status = build_local_hashed_octree(
+                local_tree, rank_array, cfg.length_per_rank, cfg.rank);
+            if (tree_status != 0)
+            {
+                std::fprintf(stderr, "Rank %d failed to build local hashed octree: %d\n",
+                             cfg.rank, tree_status);
+                MPI_Abort(MPI_COMM_WORLD, tree_status);
+            }
 
-        t2 = t1;
-        t3 = t1;
+            std::size_t leaf_count = 0;
+            for (const TreeNode &node : local_tree.nodes)
+                leaf_count += node.is_leaf ? 1u : 0u;
+
+            std::printf("[TREE] rank=%d particles=%d nodes=%zu leaves=%zu hash_entries=%zu\n",
+                        cfg.rank, cfg.length_per_rank, local_tree.nodes.size(), leaf_count,
+                        local_tree.key_to_node.size());
+        }
         break;
+    }
     }
 
     if (cfg.power < 4)

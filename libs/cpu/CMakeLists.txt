@@ -1,4 +1,5 @@
 add_library(p_sfc_cpu STATIC
+  src/hashed_octree.cpp
   src/particles_cpu.cpp
 )
 
