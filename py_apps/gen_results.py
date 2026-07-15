@@ -103,7 +103,7 @@ def prepare_data(csv_file, prefix, baseline_nprocs=BASE_EFF_NPROCS):
 
     df = pd.read_csv(csv_file, parse_dates=["datetime"])
     # columns:
-    # datetime,power,total_particles,length_per_rank,num_procs,box_length,RAM_GB,gen_time,splitters_time,dist_time,total_time,device,seed,mode
+    # datetime,power,total_particles,length_per_rank,num_procs,box_length,RAM_GB,alloc_time,gen_time,splitters_time,dist_time,total_time,device,seed,mode
 
     counts = df.groupby(["device","power","num_procs"]).size()
     print(f"[{prefix}] Runs per configuration:\n{counts}")

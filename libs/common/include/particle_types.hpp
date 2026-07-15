@@ -59,6 +59,7 @@ typedef struct
 
 typedef struct
 {
+  double alloc_time;
   double gen_time;
   double splitters_time;
   double dist_time;

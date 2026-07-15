@@ -71,19 +71,19 @@ void log_results(const ExecConfig &cfg, const exec_times &times, const char *res
     const int exists = (stat(results_path, &buffer) == 0);
     FILE *f = std::fopen(results_path, "a");
     if (!exists)
-        std::fprintf(f, "datetime,power,total_particles,length_per_rank,num_procs,box_length,RAM_GB,gen_time,splitters_time,dist_time,total_time,device,seed,mode\n");
+        std::fprintf(f, "datetime,power,total_particles,length_per_rank,num_procs,box_length,RAM_GB,alloc_time,gen_time,splitters_time,dist_time,total_time,device,seed,mode\n");
 
     const char *mode_str = (cfg.exp_type == WEAK_SCALING) ? "weak" : "strong";
 
-    std::fprintf(f, "%s,%d,%lld,%d,%d,%.1f,%.2f,%f,%f,%f,%f,%s,%d,%s\n",
+    std::fprintf(f, "%s,%d,%lld,%d,%d,%.1f,%.2f,%f,%f,%f,%f,%f,%s,%d,%s\n",
                  ts, cfg.power, cfg.total_particles, cfg.length_per_rank, cfg.nprocs,
                  cfg.box_length, cfg.ram_gb,
-                 times.gen_time, times.splitters_time, times.dist_time, times.total_time,
+                 times.alloc_time, times.gen_time, times.splitters_time, times.dist_time, times.total_time,
                  cfg.device, cfg.seed, mode_str);
 
-    std::printf("%s,%d,%lld,%d,%d,%.1f,%.2f,%f,%f,%f,%f,%s,%d,%s\n",
+    std::printf("%s,%d,%lld,%d,%d,%.1f,%.2f,%f,%f,%f,%f,%f,%s,%d,%s\n",
                 ts, cfg.power, cfg.total_particles, cfg.length_per_rank, cfg.nprocs,
                 cfg.box_length, cfg.ram_gb,
-                times.gen_time, times.splitters_time, times.dist_time, times.total_time,
+                times.alloc_time, times.gen_time, times.splitters_time, times.dist_time, times.total_time,
                 cfg.device, cfg.seed, mode_str);
 }

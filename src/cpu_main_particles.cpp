@@ -60,7 +60,7 @@ int main(int argc, char **argv)
 {
     MPI_Init(&argc, &argv);
     ExecConfig cfg;
-    exec_times times = {0.0, 0.0, 0.0, 0.0};
+    exec_times times = {};
 
     MPI_Comm_rank(MPI_COMM_WORLD, &cfg.rank);
     MPI_Comm_size(MPI_COMM_WORLD, &cfg.nprocs);
@@ -74,7 +74,17 @@ int main(int argc, char **argv)
 
     setup_particles_box_length(cfg);
     MPI_Allgather(&cfg.length_per_rank, 1, MPI_INT, length_vector, 1, MPI_INT, MPI_COMM_WORLD);
-    allocate_particle(&rank_array, cfg.length_per_rank);
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    const double alloc_t0 = MPI_Wtime();
+    const int alloc_status = allocate_particle(&rank_array, cfg.length_per_rank);
+    MPI_Barrier(MPI_COMM_WORLD);
+    const double alloc_t1 = MPI_Wtime();
+    if (alloc_status != 0)
+    {
+        std::fprintf(stderr, "Rank %d failed to allocate particle array\n", cfg.rank);
+        MPI_Abort(MPI_COMM_WORLD, alloc_status);
+    }
 
     switch (cfg.dist_type)
     {
@@ -125,6 +135,7 @@ int main(int argc, char **argv)
 
     if (cfg.rank == 0)
     {
+        times.alloc_time = alloc_t1 - alloc_t0;
         times.gen_time = t1 - t0;
         times.splitters_time = t2 - t1;
         times.dist_time = t3 - t2;
