@@ -425,7 +425,7 @@ int write_global_distributed_octree_gpu(const DistributedGpuOctree &tree,
                                          MPI_Comm communicator)
 {
     constexpr char magic[8] = {'P', 'S', 'F', 'C', 'G', 'T', 'R', 'E'};
-    constexpr std::uint32_t version = 1;
+    constexpr std::uint32_t version = 2;
 
     if (!filename || tree.leaf_count < 1 || tree.node_count < 1 ||
         !tree.d_cornerstone || !tree.d_node_keys || !tree.d_child_offsets ||
@@ -434,7 +434,9 @@ int write_global_distributed_octree_gpu(const DistributedGpuOctree &tree,
         return 1;
 
     int rank = 0;
+    int rank_count = 1;
     MPI_Comm_rank(communicator, &rank);
+    MPI_Comm_size(communicator, &rank_count);
 
     thrust::device_vector<unsigned long long> local_counts(tree.leaf_count);
     cornerstone_histogram_kernel<<<grid_size(tree.leaf_count), block_size, 0, stream>>>(
@@ -518,7 +520,7 @@ int write_global_distributed_octree_gpu(const DistributedGpuOctree &tree,
             append_binary(output, version);
             append_binary(output, static_cast<std::uint32_t>(tree.max_depth));
             append_binary(output, static_cast<std::uint32_t>(tree.ncrit));
-            append_binary(output, std::uint32_t{0});
+            append_binary(output, static_cast<std::uint32_t>(rank_count));
             append_binary(output, static_cast<std::uint64_t>(global_total));
             append_binary(output, static_cast<std::uint64_t>(tree.leaf_count));
             append_binary(output, static_cast<std::uint64_t>(tree.node_count));

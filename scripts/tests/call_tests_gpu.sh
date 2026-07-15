@@ -11,7 +11,7 @@ GPU_PER_NODE="${GPU_PER_NODE:-4}"
 NODES=$(( (MAX_NP + GPU_PER_NODE - 1) / GPU_PER_NODE ))
 export GPU_PER_NODE
 
-rm -f ./particle_file_gpu_*.par ./tree_file_gpu_*.gtree core.* || true
+rm -f ./particle_file_gpu_*.par ./tree_file_gpu_*.gtree ./tree_file_gpu_*.png core.* || true
 
 echo "[INFO] salloc partition=$PARTITION account=$ACCOUNT time=$TIME GPUs=$MAX_NP nodes=$NODES"
 salloc \

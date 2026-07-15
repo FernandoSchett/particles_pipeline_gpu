@@ -3,6 +3,7 @@ build/
 scripts/*.out
 *.par
 scripts/*.par
+scripts/tests/*.png
 .ipynb_checkpoints/
 scripts/*_logdir*/
 scripts/*jwc

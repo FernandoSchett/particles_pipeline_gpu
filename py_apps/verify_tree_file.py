@@ -5,6 +5,8 @@ from pathlib import Path
 import struct
 import sys
 
+from tree_visualization import save_tree_panels
+
 
 MAGIC = b"PSFCTREE"
 VERSION = 1
@@ -173,6 +175,7 @@ def main():
     parser = argparse.ArgumentParser(description="Validate local hashed oct-trees stored in a .tree file")
     parser.add_argument("treefile", type=Path)
     parser.add_argument("--max-depth", type=int, default=15)
+    parser.add_argument("--png", type=Path, help="output PNG path; default: tree filename with .png")
     args = parser.parse_args()
 
     try:
@@ -194,11 +197,25 @@ def main():
             raise ValueError(
                 f"section particle total {section_particles} != file total {total_particles}"
             )
+
+        panels = []
+        for owner, particle_count, nodes in trees:
+            panels.append({
+                "keys": [node.key for node in nodes],
+                "levels": [node.level for node in nodes],
+                "parents": [node.parent for node in nodes],
+                "leaves": [node.is_leaf for node in nodes],
+                "particle_counts": [node.particle_count for node in nodes],
+                "title": f"CPU rank {owner} | p={particle_count} n={len(nodes)}",
+            })
+        png_path = args.png or args.treefile.with_suffix(".png")
+        save_tree_panels(panels, png_path, f"Local CPU hashed octrees — {args.treefile.name}")
     except (OSError, ValueError, struct.error) as error:
         print(f"FAIL: {error}", file=sys.stderr)
         return 1
 
     print(f"file={args.treefile.name} trees={len(trees)} particles={total_particles}: OK")
+    print(f"image={png_path}: OK")
     return 0
 
 

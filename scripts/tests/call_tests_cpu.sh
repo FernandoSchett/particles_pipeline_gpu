@@ -12,7 +12,7 @@ NODES=$(( (MAX_NP + CPU_PER_NODE - 1) / CPU_PER_NODE ))
 TASKS_PER_NODE=$(( MAX_NP < CPU_PER_NODE ? MAX_NP : CPU_PER_NODE ))
 export CPU_PER_NODE
 
-rm -f ./*.par ./*.tree core.* || true
+rm -f ./*.par ./*.tree ./tree_file_cpu_*.png core.* || true
 
 echo "[INFO] salloc partition=$PARTITION account=$ACCOUNT time=$TIME CPUs=$MAX_NP nodes=$NODES"
 salloc \
