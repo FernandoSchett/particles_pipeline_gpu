@@ -24,7 +24,7 @@ for dist in "${DISTS[@]}"; do
         --ntasks="$np" \
         --ntasks-per-node="$tasks_per_node" \
         --cpus-per-task=1 \
-        ../../build/src/p_sfc_exe "$dist" "$PP" "$seed" "$MODE"
+        ../../build/src/p_sfc_exe "$dist" "$PP" "$seed" "$MODE" table
 
       generated=(particle_file_cpu_n"${np}"_*.par)
       if ((${#generated[@]} != 1)); then
@@ -32,6 +32,14 @@ for dist in "${DISTS[@]}"; do
         exit 1
       fi
       mv "${generated[0]}" "particle_file_cpu_${dist}_seed${seed}_${MODE}_n${np}_pp${PP}.par"
+
+      generated_trees=(tree_file_cpu_n"${np}"_*.tree)
+      if ((${#generated_trees[@]} != 1)); then
+        echo "[ERROR] Expected one CPU .tree file for np=$np, found ${#generated_trees[@]}" >&2
+        exit 1
+      fi
+      mv "${generated_trees[0]}" \
+        "tree_file_cpu_${dist}_seed${seed}_${MODE}_n${np}_pp${PP}.tree"
     done
   done
 done

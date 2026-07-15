@@ -32,4 +32,30 @@ for par_file in "${par_files[@]}"; do
     fi
 done
 
+tree_files=(./*.tree)
+if ((${#tree_files[@]} == 0)); then
+    echo "[ERROR] No CPU .tree files generated" >&2
+    verification_failed=1
+else
+    echo "[INFO] Verifying ${#tree_files[@]} CPU tree files"
+    for tree_file in "${tree_files[@]}"; do
+        if ! "$PYTHON" "$PROJECT_ROOT/py_apps/verify_tree_file.py" "$tree_file"; then
+            verification_failed=1
+        fi
+    done
+fi
+
+global_tree_files=(./*.gtree)
+if ((${#global_tree_files[@]} == 0)); then
+    echo "[ERROR] No GPU .gtree files generated" >&2
+    verification_failed=1
+else
+    echo "[INFO] Verifying ${#global_tree_files[@]} GPU global tree files"
+    for tree_file in "${global_tree_files[@]}"; do
+        if ! "$PYTHON" "$PROJECT_ROOT/py_apps/verify_global_tree_file.py" "$tree_file"; then
+            verification_failed=1
+        fi
+    done
+fi
+
 exit "$verification_failed"
