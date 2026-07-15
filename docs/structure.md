@@ -6,6 +6,7 @@
 | `py_apps/gen_results.py` | Reads experiment CSVs and generates scaling plots under `results/`.       |
 | `py_apps/visualise.py` | Reads particle binaries from `build/` and displays interactive 3D plots.    |
 | `py_apps/verify_par_file.py` | Validates ordering and load balance in particle `.par` files.          |
+| `py_apps/verify_tree_file.py` | Validates topology and particle coverage in hashed oct-tree files.    |
 | `gen_results.ipynb`   | Jupyter notebook for generating and analyzing results interactively.        |
 | `gen_results_save.ipynb` | Jupyter notebook variant for saving experiment outputs and figures.      |
 | `libs/`               | Project libraries (helper modules, reusable code for CPU/GPU, utilities).  |

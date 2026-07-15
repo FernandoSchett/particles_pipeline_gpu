@@ -152,7 +152,24 @@ int main(int argc, char **argv)
     }
 
     if (cfg.power < 4)
+    {
         write_par_cpu(cfg, rank_array, length_vector);
+        if (cfg.alg_type == BUILD_TABLE)
+        {
+            char tree_filename[128];
+            std::snprintf(tree_filename, sizeof(tree_filename),
+                          "tree_file_cpu_n%d_total%lld.tree",
+                          cfg.nprocs, cfg.total_particles);
+            const int tree_write_status = write_hashed_octree_file(
+                local_tree, cfg, tree_filename, MPI_COMM_WORLD);
+            if (tree_write_status != 0)
+            {
+                std::fprintf(stderr, "Rank %d failed to write hashed octree: %d\n",
+                             cfg.rank, tree_write_status);
+                MPI_Abort(MPI_COMM_WORLD, tree_write_status);
+            }
+        }
+    }
 
     if (cfg.rank == 0)
     {

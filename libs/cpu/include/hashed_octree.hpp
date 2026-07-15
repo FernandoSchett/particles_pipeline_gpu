@@ -2,6 +2,7 @@
 #define P_SFC_HASHED_OCTREE_HPP
 
 #include <cstdint>
+#include <mpi.h>
 #include <unordered_map>
 #include <vector>
 
@@ -45,5 +46,10 @@ int build_local_hashed_octree(HashedOctree &tree,
                               const t_particle *particles,
                               int count,
                               int owner_rank);
+
+int write_hashed_octree_file(const HashedOctree &tree,
+                             const ExecConfig &cfg,
+                             const char *filename,
+                             MPI_Comm communicator);
 
 #endif
