@@ -31,24 +31,6 @@ int register_MPI_Particle(MPI_Datatype *MPI_Particle)
     return 0;
 }
 
-int allocate_particle(t_particle **particle_array, int count)
-{
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    *particle_array = static_cast<t_particle *>(std::malloc(count * sizeof(t_particle)));
-
-    for (int i = 0; i < count; i++)
-    {
-        (*particle_array)[i].mpi_rank = rank;
-        (*particle_array)[i].key = 0;
-        (*particle_array)[i].coord[0] = 0.0;
-        (*particle_array)[i].coord[1] = 0.0;
-        (*particle_array)[i].coord[2] = 0.0;
-    }
-
-    return 0;
-}
-
 int concat_and_serial_write(t_particle **arrays, const int *counts, int nprocs, const char *filename)
 {
     long long total_ll = 0;

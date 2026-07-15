@@ -11,6 +11,7 @@ target_link_libraries(p_sfc_cpu
   PUBLIC
     p_sfc_common
     MPI::MPI_CXX
+    OpenMP::OpenMP_CXX
     third_party::random123
     Boost::headers
 )

@@ -1,12 +1,37 @@
 #include "particles_cpu.hpp"
 
+#include <cstdlib>
+
 // CPU particle generation and redistribution.
+
+int allocate_particle(t_particle **particle_array, int count)
+{
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    *particle_array = static_cast<t_particle *>(std::malloc(count * sizeof(t_particle)));
+    if (count > 0 && *particle_array == nullptr)
+        return 1;
+
+#pragma omp parallel for schedule(static)
+    for (int i = 0; i < count; ++i)
+    {
+        (*particle_array)[i].mpi_rank = rank;
+        (*particle_array)[i].key = 0;
+        (*particle_array)[i].coord[0] = 0.0;
+        (*particle_array)[i].coord[1] = 0.0;
+        (*particle_array)[i].coord[2] = 0.0;
+    }
+
+    return 0;
+}
 
 int box_distribution(t_particle **particle_array, int count, double box_length, int seed)
 {
     using RNG = r123::Philox4x32;
     RNG::key_type key = {{(uint32_t)seed, 0u}};
 
+#pragma omp parallel for schedule(static)
     for (int i = 0; i < count; ++i)
     {
         RNG::ctr_type ctr = {{(uint32_t)i, 0u, 0u, 0u}};
@@ -30,6 +55,7 @@ int torus_distribution(t_particle **particle_array, int count, double major_r, d
     const double TWO_PI = 6.283185307179586476925286766559;
     const double center = box_length * 0.5;
 
+#pragma omp parallel for schedule(static)
     for (int i = 0; i < count; ++i)
     {
         RNG::ctr_type ctr = {{(uint32_t)i, 0u, 0u, 0u}};
@@ -59,72 +85,42 @@ int torus_distribution(t_particle **particle_array, int count, double major_r, d
 
 int generate_particles_keys(t_particle *particle_array, int count, double box_length)
 {
-    std::vector<t_particle *> particles;
-    particles.reserve(count);
-
-    for (int i = 0; i < count; i++)
+#pragma omp parallel for schedule(static)
+    for (int i = 0; i < count; ++i)
     {
-        particles.push_back(&particle_array[i]);
-    }
+        t_particle &particle = particle_array[i];
+        double origin_x = 0.0;
+        double origin_y = 0.0;
+        double origin_z = 0.0;
+        double cell_size = box_length;
+        unsigned long long key = 0;
 
-    std::array<double, 3> origin = {0.0, 0.0, 0.0};
-    run_oct_tree_recursive(particles, 0, 0, box_length, origin);
+        for (int depth = 0; depth < MAX_DEPTH; ++depth)
+        {
+            const double half = cell_size * 0.5;
+            int octant = 0;
+
+            if (particle.coord[0] >= origin_x + half)
+                octant |= 1;
+            if (particle.coord[1] >= origin_y + half)
+                octant |= 2;
+            if (particle.coord[2] >= origin_z + half)
+                octant |= 4;
+
+            key = (key << 3) | static_cast<unsigned long long>(octant);
+            if (octant & 1)
+                origin_x += half;
+            if (octant & 2)
+                origin_y += half;
+            if (octant & 4)
+                origin_z += half;
+            cell_size = half;
+        }
+
+        particle.key = static_cast<long long>(key);
+    }
 
     return 0;
-}
-
-void run_oct_tree_recursive(std::vector<t_particle *> &particles, int depth, long long key_prefix, double box_length, const std::array<double, 3> &origin)
-{
-
-    // std::cout << "Call: count=" << particles.size() << " depth=" << depth << " prefix=" << key_prefix << "\n";
-
-    if (particles.empty())
-        return;
-
-    if (depth >= MAX_DEPTH)
-    {
-        for (auto *p : particles)
-        {
-            p->key = key_prefix;
-        }
-        // std::cout << "MAX_DEPTH\n";
-        return;
-    }
-
-    double half = box_length / 2.0;
-    std::array<double, 3> center = {
-        origin[0] + half,
-        origin[1] + half,
-        origin[2] + half};
-
-    std::vector<t_particle *> octants[8];
-
-    for (auto *p : particles)
-    {
-        int oct = 0;
-        if (p->coord[0] >= center[0])
-            oct |= 1;
-        if (p->coord[1] >= center[1])
-            oct |= 2;
-        if (p->coord[2] >= center[2])
-            oct |= 4;
-        octants[oct].push_back(p);
-    }
-
-    for (int i = 0; i < 8; i++)
-    {
-        if (!octants[i].empty())
-        {
-            long long new_key = (key_prefix << 3) | i;
-
-            std::array<double, 3> new_origin = {
-                origin[0] + (i & 1 ? half : 0),
-                origin[1] + (i & 2 ? half : 0),
-                origin[2] + (i & 4 ? half : 0)};
-
-            run_oct_tree_recursive(octants[i], depth + 1, new_key, half, new_origin);
-        }
-    }
 }
 
 static inline bool key_less(const t_particle &a, const t_particle &b)

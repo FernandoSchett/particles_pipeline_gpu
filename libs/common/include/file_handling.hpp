@@ -22,6 +22,4 @@ int serial_read_from_file(t_particle **particle_array, int *count, char *filenam
 
 int concat_and_serial_write(t_particle **arrays, const int *counts, int nprocs, const char *filename);
 
-int allocate_particle(t_particle **particle_array, int count);
-
 #endif

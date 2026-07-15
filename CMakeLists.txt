@@ -11,6 +11,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Dependencies
 find_package(MPI REQUIRED COMPONENTS CXX)
 find_package(Boost REQUIRED)
+find_package(OpenMP REQUIRED COMPONENTS CXX)
 
 if(P_SFC_BUILD_GPU)
   enable_language(CUDA)
