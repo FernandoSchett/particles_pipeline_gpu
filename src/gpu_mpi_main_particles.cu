@@ -13,6 +13,7 @@
 
 #include "particle_types.hpp"
 #include "particles_gpu.hcu"
+#include "distributed_octree.hcu"
 #include "file_handling.hpp"
 #include "utils.hpp"
 #include "logging.hpp"
@@ -62,7 +63,7 @@ int main(int argc, char **argv)
     MPI_Init(&argc, &argv);
 
     ExecConfig cfg;
-    exec_times times = {0.0, 0.0, 0.0, 0.0};
+    exec_times times = {};
     double t0 = 0.0, t1 = 0.0, t2 = 0.0, t3 = 0.0;
 
     MPI_Comm_rank(MPI_COMM_WORLD, &cfg.rank);
@@ -84,6 +85,7 @@ int main(int argc, char **argv)
     cudaStream_t gpu_stream;
     cudaStreamCreate(&gpu_stream);
     std::vector<unsigned long long> splitters;
+    DistributedGpuOctree global_tree;
 
     t_particle *d_rank_array = nullptr;
     t_particle *h_host_array = nullptr;
@@ -123,7 +125,10 @@ int main(int argc, char **argv)
     switch (cfg.alg_type)
     {
     case GLOBAL_SORTING:
-        if (cfg.nprocs > 1)
+    case BUILD_TABLE:
+    {
+        const bool build_table = cfg.alg_type == BUILD_TABLE;
+        if (cfg.nprocs > 1 || build_table)
             discover_splitters_gpu(d_rank_array, cfg.length_per_rank, gpu_stream, splitters);
 
         cudaStreamSynchronize(gpu_stream);
@@ -136,15 +141,44 @@ int main(int argc, char **argv)
         cudaStreamSynchronize(gpu_stream);
         MPI_Barrier(MPI_COMM_WORLD);
         t3 = MPI_Wtime();
-        break;
 
-    case BUILD_TABLE:
-
+        if (build_table)
+        {
+            constexpr int global_tree_ncrit = 64;
+            const int tree_status = build_global_distributed_octree_gpu(
+                global_tree, d_rank_array, cfg.length_per_rank,
+                global_tree_ncrit, gpu_stream, MPI_COMM_WORLD);
+            if (tree_status != 0)
+            {
+                std::fprintf(stderr, "Rank %d failed to build global GPU octree: %d\n",
+                             cfg.rank, tree_status);
+                MPI_Abort(MPI_COMM_WORLD, tree_status);
+            }
+        }
         break;
+    }
     }
 
     if (cfg.power < 4)
+    {
         write_par_gpu(cfg, d_rank_array, cfg.length_per_rank, gpu_stream);
+        if (cfg.alg_type == BUILD_TABLE)
+        {
+            char tree_filename[128];
+            std::snprintf(tree_filename, sizeof(tree_filename),
+                          "tree_file_gpu_n%d_total%lld.gtree",
+                          cfg.nprocs, cfg.total_particles);
+            const int tree_write_status = write_global_distributed_octree_gpu(
+                global_tree, d_rank_array, cfg.length_per_rank, tree_filename,
+                gpu_stream, MPI_COMM_WORLD);
+            if (tree_write_status != 0)
+            {
+                std::fprintf(stderr, "Rank %d failed to write global GPU octree: %d\n",
+                             cfg.rank, tree_write_status);
+                MPI_Abort(MPI_COMM_WORLD, tree_write_status);
+            }
+        }
+    }
 
     if (cfg.rank == 0)
     {
@@ -162,6 +196,7 @@ int main(int argc, char **argv)
         cudaFreeAsync(d_rank_array, gpu_stream);
     if (h_host_array)
         cudaFreeHost(h_host_array);
+    free_distributed_octree_gpu(global_tree, gpu_stream);
 
     cudaStreamDestroy(gpu_stream);
     MPI_Barrier(MPI_COMM_WORLD);

@@ -1,0 +1,39 @@
+#ifndef P_SFC_DISTRIBUTED_OCTREE_HCU
+#define P_SFC_DISTRIBUTED_OCTREE_HCU
+
+#include <cuda_runtime_api.h>
+#include <mpi.h>
+
+#include "particle_types.hpp"
+
+struct DistributedGpuOctree
+{
+    unsigned long long *d_cornerstone = nullptr;
+    unsigned long long *d_node_keys = nullptr;
+    int *d_child_offsets = nullptr;
+    int *d_level_offsets = nullptr;
+
+    int leaf_count = 0;
+    int node_count = 0;
+    int max_depth = MAX_DEPTH;
+    int ncrit = 0;
+};
+
+int build_global_distributed_octree_gpu(DistributedGpuOctree &tree,
+                                        t_particle *d_particles,
+                                        int local_particle_count,
+                                        int ncrit,
+                                        cudaStream_t stream,
+                                        MPI_Comm communicator);
+
+int write_global_distributed_octree_gpu(const DistributedGpuOctree &tree,
+                                         const t_particle *d_particles,
+                                         int local_particle_count,
+                                         const char *filename,
+                                         cudaStream_t stream,
+                                         MPI_Comm communicator);
+
+void free_distributed_octree_gpu(DistributedGpuOctree &tree,
+                                 cudaStream_t stream);
+
+#endif

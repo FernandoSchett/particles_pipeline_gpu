@@ -1,4 +1,5 @@
 add_library(p_sfc_gpu STATIC
+  src/distributed_octree.cu
   src/particles_gpu.cu
 )
 
