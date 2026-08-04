@@ -19,3 +19,7 @@ target_link_libraries(p_sfc_cpu
 set_target_properties(p_sfc_cpu PROPERTIES
   POSITION_INDEPENDENT_CODE ON
 )
+
+if(BUILD_TESTING)
+  add_subdirectory(tests)
+endif()

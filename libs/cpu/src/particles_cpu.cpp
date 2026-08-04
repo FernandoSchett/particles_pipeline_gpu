@@ -320,6 +320,71 @@ int redistribute_by_splitters_cpu(t_particle **particles,
     return 0;
 }
 
+int validate_mpi_key_boundaries(const t_particle *particles,
+                                int particle_count,
+                                MPI_Comm communicator)
+{
+    int rank = 0;
+    int nprocs = 1;
+    MPI_Comm_rank(communicator, &rank);
+    MPI_Comm_size(communicator, &nprocs);
+
+    int local_status = 0;
+    if (particle_count < 0 || (particle_count > 0 && particles == nullptr))
+        local_status = 1;
+    else if (particle_count > 1 &&
+             !std::is_sorted(particles, particles + particle_count, key_less))
+        local_status = 2;
+    else
+        for (int index = 0; index < particle_count; ++index)
+            if (particles[index].mpi_rank != rank)
+            {
+                local_status = 4;
+                break;
+            }
+
+    int global_status = 0;
+    MPI_Allreduce(&local_status, &global_status, 1, MPI_INT, MPI_MAX, communicator);
+    if (global_status != 0)
+        return global_status;
+
+    const int has_particles = particle_count > 0 ? 1 : 0;
+    const unsigned long long first_key = has_particles
+                                             ? static_cast<unsigned long long>(particles[0].key)
+                                             : 0;
+    const unsigned long long last_key = has_particles
+                                            ? static_cast<unsigned long long>(particles[particle_count - 1].key)
+                                            : 0;
+    std::vector<int> all_have(nprocs);
+    std::vector<unsigned long long> all_first(nprocs), all_last(nprocs);
+    MPI_Allgather(&has_particles, 1, MPI_INT,
+                  all_have.data(), 1, MPI_INT, communicator);
+    MPI_Allgather(&first_key, 1, MPI_UNSIGNED_LONG_LONG,
+                  all_first.data(), 1, MPI_UNSIGNED_LONG_LONG, communicator);
+    MPI_Allgather(&last_key, 1, MPI_UNSIGNED_LONG_LONG,
+                  all_last.data(), 1, MPI_UNSIGNED_LONG_LONG, communicator);
+
+    int previous = -1;
+    int invalid = 0;
+    for (int current = 0; current < nprocs; ++current)
+    {
+        if (!all_have[current])
+            continue;
+        if (previous >= 0 && all_last[previous] >= all_first[current])
+        {
+            if (rank == 0)
+            {
+                std::fprintf(stderr,
+                             "MPI Morton boundary error: rank %d last key %llu overlaps rank %d first key %llu\n",
+                             previous, all_last[previous], current, all_first[current]);
+            }
+            invalid = 1;
+        }
+        previous = current;
+    }
+    return invalid ? 3 : 0;
+}
+
 void write_par_cpu(const ExecConfig &cfg,
                    t_particle *rank_array,
                    int *length_vector)

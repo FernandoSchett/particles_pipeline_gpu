@@ -29,5 +29,9 @@ void discover_splitters_cpu(t_particle *particles, int local_n, std::vector<unsi
 
 int redistribute_by_splitters_cpu(t_particle **particles, int *particle_vector_size, const std::vector<unsigned long long> &splitters);
 
+int validate_mpi_key_boundaries(const t_particle *particles,
+                                int particle_count,
+                                MPI_Comm communicator);
+
 void write_par_cpu(const ExecConfig &cfg, t_particle *rank_array, int *length_vector);
 #endif

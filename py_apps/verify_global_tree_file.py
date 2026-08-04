@@ -4,9 +4,6 @@ from pathlib import Path
 import struct
 import sys
 
-from tree_visualization import save_tree_panels
-
-
 MAGIC = b"PSFCGTRE"
 VERSION = 2
 HEADER = struct.Struct("<8sIIIIQQQ")
@@ -115,41 +112,9 @@ def validate(path):
 def main():
     parser = argparse.ArgumentParser(description="Validate distributed GPU octree .gtree file")
     parser.add_argument("treefile", type=Path)
-    parser.add_argument("--png", type=Path, help="output PNG path; default: tree filename with .png")
     args = parser.parse_args()
     try:
         tree = validate(args.treefile)
-
-        keys = tree["node_keys"]
-        children = tree["child_offsets"]
-        levels = [node_level(key) for key in keys]
-        parents = [-1] * len(keys)
-        for parent, first_child in enumerate(children):
-            if first_child:
-                for child in range(first_child, first_child + 8):
-                    parents[child] = parent
-
-        leaf_count_by_key = {}
-        depth = tree["max_depth"]
-        for begin, end, count in zip(tree["cornerstone"], tree["cornerstone"][1:],
-                                     tree["leaf_counts"]):
-            level = depth - ((end - begin).bit_length() - 1) // 3
-            key = (1 << (3 * level)) | (begin >> (3 * (depth - level)))
-            leaf_count_by_key[key] = count
-        counts = [leaf_count_by_key.get(key, 0) for key in keys]
-        leaves_mask = [child == 0 for child in children]
-        panels = [{
-            "keys": keys,
-            "levels": levels,
-            "parents": parents,
-            "leaves": leaves_mask,
-            "particle_counts": counts,
-            "title": (f"GPU rank {rank} | global replicada\n"
-                      f"p={tree['particles']} n={tree['node_count']}"),
-        } for rank in range(tree["rank_count"])]
-        png_path = args.png or args.treefile.with_suffix(".png")
-        save_tree_panels(panels, png_path,
-                         f"Global distributed GPU octree — {args.treefile.name}")
     except (OSError, ValueError, struct.error) as error:
         print(f"FAIL: {error}", file=sys.stderr)
         return 1
@@ -158,7 +123,6 @@ def main():
         f"leaves={tree['leaf_count']} nodes={tree['node_count']} "
         f"internal={tree['internal_count']} depth={tree['max_depth']} ncrit={tree['ncrit']}: OK"
     )
-    print(f"image={png_path}: OK")
     return 0
 
 

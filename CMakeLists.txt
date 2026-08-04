@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.22)
 project(P_SFC VERSION 0.0.1 LANGUAGES CXX)
 
+include(CTest)
+
 option(P_SFC_BUILD_GPU "Build MPI+CUDA executable" ON)
 
 set(CMAKE_CXX_STANDARD 20) # Set CPP version

@@ -5,9 +5,6 @@ from pathlib import Path
 import struct
 import sys
 
-from tree_visualization import save_tree_panels
-
-
 MAGIC = b"PSFCTREE"
 VERSION = 1
 HEADER = struct.Struct("<8sIIQ")
@@ -96,7 +93,7 @@ def child_indices(nodes, parent_index):
     return children
 
 
-def validate_tree(owner, particle_count, nodes, max_depth):
+def validate_tree(owner, particle_count, total_particles, nodes, max_depth):
     if not nodes:
         raise ValueError(f"rank {owner}: missing root")
     if owner < 0:
@@ -105,34 +102,51 @@ def validate_tree(owner, particle_count, nodes, max_depth):
     root = nodes[0]
     if (root.key, root.level, root.parent) != (1, 0, -1):
         raise ValueError(f"rank {owner}: invalid root topology")
-    if root.particle_count != particle_count:
+    if root.owner != -1 or root.is_branch or root.is_remote:
+        raise ValueError(f"rank {owner}: root is not a global fill node")
+    if root.particle_count != total_particles:
         raise ValueError(
-            f"rank {owner}: root count {root.particle_count} != section count {particle_count}"
+            f"rank {owner}: root count {root.particle_count} != global count {total_particles}"
         )
 
     keys = {}
     referenced_children = set()
+    local_branches = []
     for index, node in enumerate(nodes):
         if node.key in keys:
             raise ValueError(f"rank {owner}: duplicate key {node.key} at nodes {keys[node.key]} and {index}")
         keys[node.key] = index
 
-        if node.owner != owner:
-            raise ValueError(f"rank {owner}: node {index} has owner {node.owner}")
         if not 0 <= node.level <= max_depth:
             raise ValueError(f"rank {owner}: node {index} has invalid level {node.level}")
         if node.key.bit_length() != 1 + 3 * node.level:
             raise ValueError(f"rank {owner}: node {index} key has invalid placeholder/level")
-        if node.is_remote or node.is_branch:
-            raise ValueError(f"rank {owner}: local construction marked node {index} remote/branch")
-        if not node.children_available:
-            raise ValueError(f"rank {owner}: local node {index} has unavailable children")
+        if node.is_branch:
+            if node.owner < 0:
+                raise ValueError(f"rank {owner}: branch {index} has invalid owner")
+            expected_remote = node.owner != owner
+            if node.is_remote != expected_remote:
+                raise ValueError(f"rank {owner}: branch {index} has inconsistent remote flag")
+            if node.children_available == expected_remote:
+                raise ValueError(f"rank {owner}: branch {index} has inconsistent child availability")
+            if expected_remote:
+                if node.particle_begin != -1 or node.first_child != -1:
+                    raise ValueError(f"rank {owner}: remote branch {index} is not a stub")
+            else:
+                if node.particle_begin < 0:
+                    raise ValueError(f"rank {owner}: local branch {index} has no particle range")
+                local_branches.append(node)
+        elif node.owner == -1:
+            if node.is_remote or not node.children_available or node.particle_begin != -1:
+                raise ValueError(f"rank {owner}: invalid fill node {index}")
+        elif node.owner != owner or node.is_remote or not node.children_available:
+            raise ValueError(f"rank {owner}: invalid local subtree node {index}")
 
         children = child_indices(nodes, index)
-        if node.is_leaf:
+        if node.is_leaf and not node.is_remote:
             if children or node.child_mask:
                 raise ValueError(f"rank {owner}: leaf {index} has children")
-        elif not children:
+        elif not children and not node.is_remote:
             raise ValueError(f"rank {owner}: internal node {index} has no children")
 
         mask = 0
@@ -149,12 +163,13 @@ def validate_tree(owner, particle_count, nodes, max_depth):
                 raise ValueError(f"rank {owner}: child {child_index} key does not derive from parent")
             octant = child.key & 7
             mask |= 1 << octant
-            if child.particle_begin != expected_begin:
-                raise ValueError(f"rank {owner}: child {child_index} leaves gap/overlap in particle range")
-            expected_begin += child.particle_count
+            if node.owner == owner:
+                if child.particle_begin != expected_begin:
+                    raise ValueError(f"rank {owner}: child {child_index} leaves gap/overlap in particle range")
+                expected_begin += child.particle_count
             child_particle_count += child.particle_count
 
-        if mask != node.child_mask:
+        if not node.is_remote and mask != node.child_mask:
             raise ValueError(f"rank {owner}: node {index} child mask mismatch")
         if children and child_particle_count != node.particle_count:
             raise ValueError(f"rank {owner}: node {index} child particle counts mismatch")
@@ -164,18 +179,36 @@ def validate_tree(owner, particle_count, nodes, max_depth):
         missing = sorted(expected_children - referenced_children)
         raise ValueError(f"rank {owner}: unreachable nodes {missing[:8]}")
 
-    leaf_particles = sum(node.particle_count for node in nodes if node.is_leaf)
+    local_branches.sort(key=lambda node: node.particle_begin)
+    expected_begin = 0
+    for branch in local_branches:
+        if branch.particle_begin != expected_begin:
+            raise ValueError(f"rank {owner}: local branch particle ranges have gap/overlap")
+        expected_begin += branch.particle_count
+    if expected_begin != particle_count:
+        raise ValueError(
+            f"rank {owner}: local branch total {expected_begin} != section count {particle_count}"
+        )
+
+    leaf_particles = sum(
+        node.particle_count for node in nodes
+        if node.is_leaf and node.owner == owner and not node.is_remote
+    )
     if leaf_particles != particle_count:
         raise ValueError(f"rank {owner}: leaf particle total {leaf_particles} != {particle_count}")
 
-    return sum(node.is_leaf for node in nodes)
+    global_signature = tuple(sorted(
+        (node.key, node.owner, node.level, node.particle_count,
+         node.child_mask, node.is_branch, node.is_leaf)
+        for node in nodes if node.owner == -1 or node.is_branch
+    ))
+    return sum(node.is_leaf for node in nodes), global_signature
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Validate local hashed oct-trees stored in a .tree file")
+    parser = argparse.ArgumentParser(description="Validate distributed hashed oct-trees stored in a .tree file")
     parser.add_argument("treefile", type=Path)
     parser.add_argument("--max-depth", type=int, default=15)
-    parser.add_argument("--png", type=Path, help="output PNG path; default: tree filename with .png")
     args = parser.parse_args()
 
     try:
@@ -185,8 +218,12 @@ def main():
             raise ValueError(f"tree owners must be ranks 0..{len(trees) - 1}, got {owners}")
 
         section_particles = 0
+        global_signatures = []
         for owner, particle_count, nodes in trees:
-            leaves = validate_tree(owner, particle_count, nodes, args.max_depth)
+            leaves, global_signature = validate_tree(
+                owner, particle_count, total_particles, nodes, args.max_depth
+            )
+            global_signatures.append(global_signature)
             section_particles += particle_count
             print(
                 f"rank={owner} particles={particle_count} nodes={len(nodes)} "
@@ -197,25 +234,13 @@ def main():
             raise ValueError(
                 f"section particle total {section_particles} != file total {total_particles}"
             )
-
-        panels = []
-        for owner, particle_count, nodes in trees:
-            panels.append({
-                "keys": [node.key for node in nodes],
-                "levels": [node.level for node in nodes],
-                "parents": [node.parent for node in nodes],
-                "leaves": [node.is_leaf for node in nodes],
-                "particle_counts": [node.particle_count for node in nodes],
-                "title": f"CPU rank {owner} | p={particle_count} n={len(nodes)}",
-            })
-        png_path = args.png or args.treefile.with_suffix(".png")
-        save_tree_panels(panels, png_path, f"Local CPU hashed octrees — {args.treefile.name}")
+        if any(signature != global_signatures[0] for signature in global_signatures[1:]):
+            raise ValueError("global root/fill/branch topology differs between ranks")
     except (OSError, ValueError, struct.error) as error:
         print(f"FAIL: {error}", file=sys.stderr)
         return 1
 
     print(f"file={args.treefile.name} trees={len(trees)} particles={total_particles}: OK")
-    print(f"image={png_path}: OK")
     return 0
 
 
