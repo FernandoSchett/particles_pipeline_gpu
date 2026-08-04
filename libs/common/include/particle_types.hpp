@@ -63,6 +63,7 @@ typedef struct
   double gen_time;
   double splitters_time;
   double dist_time;
+  double tree_time;
   double total_time;
 } exec_times;
 

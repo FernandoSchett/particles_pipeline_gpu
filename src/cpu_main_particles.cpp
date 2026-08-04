@@ -144,7 +144,9 @@ void record_execution_times(
     double generation_start,
     double generation_end,
     double splitters_end,
-    double distribution_end)
+    double distribution_end,
+    double tree_start,
+    double tree_end)
 {
     if (cfg.rank != 0)
         return;
@@ -153,7 +155,8 @@ void record_execution_times(
     times.gen_time = generation_end - generation_start;
     times.splitters_time = splitters_end - generation_end;
     times.dist_time = distribution_end - splitters_end;
-    times.total_time = distribution_end - generation_start;
+    times.tree_time = tree_end - tree_start;
+    times.total_time = tree_end - generation_start;
 
     const char *mode = cfg.exp_type == WEAK_SCALING ? "weak" : "strong";
     const std::string output = std::string("../results_") + mode + ".csv";
@@ -203,8 +206,12 @@ int main(int argc, char **argv)
     distribute_particles_by_morton_key(
         &particles, cfg, splitters, splitters_end, distribution_end);
 
+    double tree_start = distribution_end;
+    double tree_end = distribution_end;
     if (cfg.alg_type == BUILD_TABLE)
     {
+        MPI_Barrier(MPI_COMM_WORLD);
+        tree_start = MPI_Wtime();
         const DistributedTreeBuildParameters tree_parameters{
             particles,
             cfg.length_per_rank,
@@ -213,6 +220,8 @@ int main(int argc, char **argv)
             MPI_COMM_WORLD};
         construct_distributed_hashed_octree_cpu(
             distributed_tree, tree_parameters);
+        MPI_Barrier(MPI_COMM_WORLD);
+        tree_end = MPI_Wtime();
         print_distributed_tree_summary(distributed_tree, cfg);
     }
 
@@ -221,7 +230,8 @@ int main(int argc, char **argv)
 
     record_execution_times(
         cfg, times, allocation_start, allocation_end,
-        generation_start, generation_end, splitters_end, distribution_end);
+        generation_start, generation_end, splitters_end, distribution_end,
+        tree_start, tree_end);
 
     std::free(particles);
     MPI_Type_free(&MPI_particle);

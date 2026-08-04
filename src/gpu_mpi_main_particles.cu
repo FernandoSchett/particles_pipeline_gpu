@@ -65,6 +65,7 @@ int main(int argc, char **argv)
     ExecConfig cfg;
     exec_times times = {};
     double t0 = 0.0, t1 = 0.0, t2 = 0.0, t3 = 0.0;
+    double tree_start = 0.0, tree_end = 0.0;
 
     MPI_Comm_rank(MPI_COMM_WORLD, &cfg.rank);
     MPI_Comm_size(MPI_COMM_WORLD, &cfg.nprocs);
@@ -141,9 +142,14 @@ int main(int argc, char **argv)
         cudaStreamSynchronize(gpu_stream);
         MPI_Barrier(MPI_COMM_WORLD);
         t3 = MPI_Wtime();
+        tree_start = t3;
+        tree_end = t3;
 
         if (build_table)
         {
+            cudaStreamSynchronize(gpu_stream);
+            MPI_Barrier(MPI_COMM_WORLD);
+            tree_start = MPI_Wtime();
             constexpr int global_tree_ncrit = 64;
             const int tree_status = build_global_distributed_octree_gpu(
                 global_tree, d_rank_array, cfg.length_per_rank,
@@ -154,6 +160,9 @@ int main(int argc, char **argv)
                              cfg.rank, tree_status);
                 MPI_Abort(MPI_COMM_WORLD, tree_status);
             }
+            cudaStreamSynchronize(gpu_stream);
+            MPI_Barrier(MPI_COMM_WORLD);
+            tree_end = MPI_Wtime();
         }
         break;
     }
@@ -185,7 +194,8 @@ int main(int argc, char **argv)
         times.gen_time = t1 - t0;
         times.splitters_time = t2 - t1;
         times.dist_time = t3 - t2;
-        times.total_time = t3 - t0;
+        times.tree_time = tree_end - tree_start;
+        times.total_time = tree_end - t0;
 
         const char *mode_str = (cfg.exp_type == WEAK_SCALING) ? "weak" : "strong";
         std::string out = std::string("../results_") + mode_str + ".csv";
