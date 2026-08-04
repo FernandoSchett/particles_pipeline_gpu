@@ -9,4 +9,5 @@ scripts/*_logdir*/
 scripts/*jwc
 scripts/core.jwb*.juwels.*
 .venv/
+*.tree
 __pycache__/
