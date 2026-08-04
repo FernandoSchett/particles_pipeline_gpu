@@ -166,7 +166,7 @@ def create_rank_figure(rank, local_particle_count, nodes, particles,
                        box_size, max_depth, show_leaf_links):
     figure = plt.figure(figsize=(12, 8))
     axis = figure.add_axes([0.04, 0.08, 0.70, 0.86], projection="3d")
-    axis.set_title(f"Rank {rank} — árvore materializada ({len(nodes)} nós)")
+    axis.set_title(f"Rank {rank} — Materialized Distributed Tree ({len(nodes)} nodes)")
     axis.set_xlabel("X")
     axis.set_ylabel("Y")
     axis.set_zlabel("Z")
@@ -182,12 +182,12 @@ def create_rank_figure(rank, local_particle_count, nodes, particles,
     local_particles = axis.scatter(
         local_coords[:, 0], local_coords[:, 1], local_coords[:, 2],
         color=plt.get_cmap("tab10")(rank % 10), s=14, alpha=0.9,
-        depthshade=False, label="partículas locais",
+        depthshade=False, label="local particles",
     )
     remote_particles = axis.scatter(
         remote_coords[:, 0], remote_coords[:, 1], remote_coords[:, 2],
         color="#808080", s=7, alpha=0.18,
-        depthshade=False, label="partículas remotas",
+        depthshade=False, label="remote particles",
     )
 
     centers = np.asarray([
@@ -210,13 +210,13 @@ def create_rank_figure(rank, local_particle_count, nodes, particles,
             edge_segments[category].append([centers[node.parent], centers[index]])
 
     root_artist = add_nodes(axis, centers, categories["root"],
-                            "#111111", "*", 110, "root global")
+                            "#111111", "*", 110, "global root")
     fill_artist = add_nodes(axis, centers, categories["fill_nodes"],
                             "#06b6d4", "o", 18, "fill nodes")
     local_branch_artist = add_nodes(axis, centers, categories["local_branches"],
-                                    "#dc2626", "D", 34, "branches locais")
+                                    "#dc2626", "D", 34, "local branches")
     remote_branch_artist = add_nodes(axis, centers, categories["remote_branches"],
-                                     "#9333ea", "X", 38, "branches remotas")
+                                     "#9333ea", "X", 38, "remote branches")
 
     local_internal = [
         index for index in categories["local_subtree"] if not nodes[index].is_leaf
@@ -225,9 +225,9 @@ def create_rank_figure(rank, local_particle_count, nodes, particles,
         index for index in categories["local_subtree"] if nodes[index].is_leaf
     ]
     internal_artist = add_nodes(axis, centers, local_internal,
-                                "#2563eb", "o", 13, "nós internos locais")
+                                "#2563eb", "o", 13, "local internal nodes")
     leaf_artist = add_nodes(axis, centers, local_leaves,
-                            "#16a34a", "^", 24, "folhas locais")
+                            "#16a34a", "^", 24, "local leaves")
 
     fill_edges = add_segments(axis, edge_segments["fill_nodes"], "#67e8f9", 0.9, 0.7)
     local_branch_edges = add_segments(
@@ -262,16 +262,19 @@ def create_rank_figure(rank, local_particle_count, nodes, particles,
     leaf_link_artist = add_segments(axis, leaf_segments, "#22c55e", 0.45, 0.35)
     leaf_link_artist.set_visible(show_leaf_links)
 
+    axis.legend(loc="upper left", fontsize=7, title="Symbols")
+
     controls = {
-        "partículas locais": [local_particles],
-        "partículas remotas": [remote_particles],
+        "local particles": [local_particles],
+        "remote particles": [remote_particles],
         "fill nodes": [fill_artist, fill_edges],
-        "branches locais": [local_branch_artist, local_branch_edges],
-        "branches remotas": [remote_branch_artist, remote_branch_edges],
-        "subárvore local": [internal_artist, leaf_artist, subtree_edges],
-        "folha → partículas": [leaf_link_artist],
+        "local branches": [local_branch_artist, local_branch_edges],
+        "remote branches": [remote_branch_artist, remote_branch_edges],
+        "local subtree": [internal_artist, leaf_artist, subtree_edges],
+        "leaf → particles": [leaf_link_artist],
     }
     control_axis = figure.add_axes([0.77, 0.28, 0.21, 0.38])
+    control_axis.set_title("Visibility", fontsize=10)
     labels = list(controls)
     initial = [all(artist.get_visible() for artist in controls[label]) for label in labels]
     check_buttons = CheckButtons(control_axis, labels, initial)
@@ -291,21 +294,32 @@ def create_rank_figure(rank, local_particle_count, nodes, particles,
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Visualização 3D interativa de partículas e árvores distribuídas CPU"
+        description="Interactive 3D visualization of particles and distributed CPU trees"
     )
-    parser.add_argument("par_file", type=Path, help="arquivo .par com todas as partículas")
-    parser.add_argument("tree_file", type=Path, help="arquivo .tree distribuído")
+    parser.add_argument("par_file", nargs="?", type=Path,
+                        help=".par file containing all particles")
+    parser.add_argument("tree_file", nargs="?", type=Path,
+                        help="distributed .tree file")
+    parser.add_argument("--par-file", "--par_file", dest="par_file_option", type=Path,
+                        help=".par file containing all particles")
+    parser.add_argument("--tree-file", "--tree_file", dest="tree_file_option", type=Path,
+                        help="distributed .tree file")
     parser.add_argument("--box-size", type=float,
-                        help="tamanho da caixa; inferido das coordenadas quando omitido")
+                        help="box size; inferred from coordinates when omitted")
     parser.add_argument("--max-depth", type=int, default=15,
-                        help="profundidade da Morton key usada para validar nós")
+                        help="Morton-key depth used to validate nodes")
     parser.add_argument("--show-leaf-links", action="store_true",
-                        help="mostrar inicialmente ligações folha-partícula")
+                        help="show leaf-to-particle links initially")
     args = parser.parse_args()
 
+    par_file = args.par_file_option or args.par_file
+    tree_file = args.tree_file_option or args.tree_file
+    if par_file is None or tree_file is None:
+        parser.error("provide par_file and tree_file, positionally or with --par_file/--tree_file")
+
     try:
-        particles = read_particles(args.par_file)
-        total_particles, trees = read_trees(args.tree_file)
+        particles = read_particles(par_file)
+        total_particles, trees = read_trees(tree_file)
         if len(particles) != total_particles:
             raise ValueError(
                 f".par has {len(particles)} particles, .tree reports {total_particles}"
