@@ -32,6 +32,31 @@ __global__ void box_distribution_kernel(t_particle *particles, int N, double L, 
     }
 }
 
+__global__ void box_x_gradient_kernel(t_particle *particles, int N, double L, unsigned long long seed)
+{
+    using RNG = r123::Philox4x32;
+    RNG::key_type key = {{(uint32_t)seed, (uint32_t)(seed >> 32)}};
+    double x, z, temp;
+
+    for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < N; i += blockDim.x * gridDim.x)
+    {
+        RNG::ctr_type ctr = {{(uint32_t)i, 0u, 0u, 0u}};
+        RNG::ctr_type r = RNG()(ctr, key);
+
+        x = r123::u01<double>(r.v[0]) * L;
+        z = r123::u01<double>(r.v[2]) * L;
+
+        if (x < z){
+            temp = x;
+            x = z;
+            z = temp;
+        }
+        particles[i].coord[0] = x; //r123::u01<double>(r.v[0]) * L;
+        particles[i].coord[1] = r123::u01<double>(r.v[1]) * L;
+        particles[i].coord[2] = z; //r123::u01<double>(r.v[2]) * L;
+    }
+}
+
 __global__ void torus_distribution_kernel(t_particle *particles, int N, double major_r, double minor_r, double box_length, unsigned long long seed)
 {
     using RNG = r123::Philox4x32;
