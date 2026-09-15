@@ -19,6 +19,7 @@
 #include "file_handling.hpp"
 
 int box_distribution(t_particle **particle_array, int count, double box_length, int seed);
+int triangle_distribution(t_particle **particle_array, int count, double box_length, int seed);
 int torus_distribution(t_particle **particle_array, int count, double major_r, double minor_r, double box_length, int seed);
 
 int allocate_particle(t_particle **particle_array, int count);

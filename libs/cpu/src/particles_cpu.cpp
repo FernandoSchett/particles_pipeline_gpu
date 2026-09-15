@@ -48,6 +48,19 @@ int box_distribution(t_particle **particle_array, int count, double box_length, 
     return 0;
 }
 
+int triangle_distribution(t_particle **particle_array, int count, double box_length, int seed)
+{
+    box_distribution(particle_array, count, box_length, seed);
+#pragma omp parallel for schedule(static)
+    for (int i = 0; i < count; ++i)
+    {
+        double *coord = (*particle_array)[i].coord;
+        if (coord[0] < coord[2])
+            std::swap(coord[0], coord[2]);
+    }
+    return 0;
+}
+
 int torus_distribution(t_particle **particle_array, int count, double major_r, double minor_r, double box_length, int seed)
 {
     using RNG = r123::Philox4x32;

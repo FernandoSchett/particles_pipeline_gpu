@@ -27,6 +27,8 @@ void parse_args(int argc, char **argv, ExecConfig &cfg)
             cfg.dist_type = DIST_BOX;
         else if (strcmp(argv[1], "torus") == 0)
             cfg.dist_type = DIST_TORUS;
+        else if (strcmp(argv[1], "triangle") == 0)
+            cfg.dist_type = DIST_TRIANGLE;
     }
     if (cfg.dist_type == DIST_UNKNOWN)
         cfg.dist_type = DIST_BOX;
@@ -64,6 +66,9 @@ int generate_particle_coordinates(const ExecConfig &cfg, t_particle **particles)
         return torus_distribution(
             particles, cfg.length_per_rank, cfg.major_r, cfg.minor_r,
             cfg.box_length, cfg.seed + cfg.rank);
+    case DIST_TRIANGLE:
+        return triangle_distribution(
+            particles, cfg.length_per_rank, cfg.box_length, cfg.seed + cfg.rank);
     default:
         return box_distribution(
             particles, cfg.length_per_rank, cfg.box_length, cfg.seed + cfg.rank);
