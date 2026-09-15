@@ -1,3 +1,20 @@
+/**
+ * @file distributed_octree.cu
+ * @brief Build a replicated global GPU octree from distributed Morton keys.
+ * @details build_global_distributed_octree_gpu() executes this sequence:
+ * 1. Sort local particle keys with Thrust and initialize one root cornerstone interval.
+ * 2. cornerstone_histogram_kernel(): count local particles in each leaf interval.
+ * 3. MPI_Allreduce(): sum leaf counts globally through host buffers.
+ * 4. rebalance_decision_kernel(): mark overloaded leaves for subdivision.
+ * 5. Thrust exclusive_scan() and rebalance_cornerstone_kernel(): allocate positions and write new boundaries.
+ *    Repeat steps 2 through 5 until no leaf can split under the occupancy and depth limits.
+ * 6. generate_node_candidates_kernel(): generate leaf and ancestor keys; sort and deduplicate them with Thrust.
+ * 7. Thrust lower_bound() and connectivity_kernel(): build level boundaries and child links.
+ * 8. copy_vector_to_raw(): store the final arrays in the output tree.
+ *
+ * After construction, write_global_distributed_octree_gpu() can export the tree,
+ * and free_distributed_octree_gpu() releases its device storage.
+ */
 #include "distributed_octree.hcu"
 
 #include <algorithm>
@@ -22,11 +39,24 @@ namespace
 constexpr int block_size = 256;
 constexpr unsigned long long invalid_key = std::numeric_limits<unsigned long long>::max();
 
+/**
+ * @brief Calculate a nonzero CUDA grid size for a work count.
+ * @return At least one block, with block_size threads per block.
+ *
+ * @param count Number of work items.
+ */
 int grid_size(int count)
 {
     return std::max(1, (count + block_size - 1) / block_size);
 }
 
+/**
+ * @brief Report a CUDA error and convert its status to an integer.
+ * @return Zero on success, otherwise the CUDA error code.
+ *
+ * @param status CUDA runtime result.
+ * @param operation Description printed on failure.
+ */
 int check_cuda(cudaError_t status, const char *operation)
 {
     if (status == cudaSuccess)
@@ -37,6 +67,14 @@ int check_cuda(cudaError_t status, const char *operation)
     return static_cast<int>(status);
 }
 
+/**
+ * @brief Find the first particle whose Morton key is at least the requested key.
+ * @return Matching index, or count if all keys are smaller.
+ *
+ * @param particles Sorted device particle array.
+ * @param count Number of particles.
+ * @param key Search threshold.
+ */
 __device__ int lower_bound_particle_key(const t_particle *particles,
                                         int count,
                                         unsigned long long key)
@@ -60,6 +98,15 @@ __device__ int lower_bound_particle_key(const t_particle *particles,
     return first;
 }
 
+/**
+ * @brief Count local particles in each half-open cornerstone leaf interval.
+ *
+ * @param particles Device particles sorted by Morton key.
+ * @param particle_count Number of local particles.
+ * @param cornerstone Device array of leaf_count + 1 ordered boundaries.
+ * @param leaf_count Number of leaf intervals.
+ * @param counts Output device array of leaf_count local counts.
+ */
 __global__ void cornerstone_histogram_kernel(const t_particle *particles,
                                               int particle_count,
                                               const unsigned long long *cornerstone,
@@ -78,6 +125,16 @@ __global__ void cornerstone_histogram_kernel(const t_particle *particles,
     }
 }
 
+/**
+ * @brief Mark overloaded leaves for subdivision into eight children.
+ * @details A leaf splits only if its count exceeds ncrit and its key interval has width greater than one.
+ *
+ * @param cornerstone Device array of leaf_count + 1 boundaries.
+ * @param global_counts Device array of global particle counts per leaf.
+ * @param leaf_count Number of leaves.
+ * @param ncrit Maximum desired particle count per leaf.
+ * @param decisions Output device array: 8 for subdivision, 1 to retain a leaf.
+ */
 __global__ void rebalance_decision_kernel(const unsigned long long *cornerstone,
                                           const unsigned long long *global_counts,
                                           int leaf_count,
@@ -93,6 +150,16 @@ __global__ void rebalance_decision_kernel(const unsigned long long *cornerstone,
     }
 }
 
+/**
+ * @brief Write retained leaf starts and new child boundaries.
+ * @note The caller must append the final domain endpoint.
+ *
+ * @param old_cornerstone Device array of old_leaf_count + 1 boundaries.
+ * @param decisions Device output multiplicities, either 1 or 8.
+ * @param offsets Device exclusive prefix sum of decisions.
+ * @param old_leaf_count Number of input leaves.
+ * @param new_cornerstone Output device boundary array sized for the new leaves plus one.
+ */
 __global__ void rebalance_cornerstone_kernel(const unsigned long long *old_cornerstone,
                                              const int *decisions,
                                              const int *offsets,
@@ -118,6 +185,14 @@ __global__ void rebalance_cornerstone_kernel(const unsigned long long *old_corne
     }
 }
 
+/**
+ * @brief Generate each leaf key and its ancestor keys with a leading level marker.
+ * @details Levels below a leaf receive invalid_key. The caller sorts and removes duplicates and invalid entries.
+ *
+ * @param cornerstone Device array of leaf_count + 1 boundaries.
+ * @param leaf_count Number of leaves.
+ * @param candidates Output device array of leaf_count * (MAX_DEPTH + 1) entries.
+ */
 __global__ void generate_node_candidates_kernel(const unsigned long long *cornerstone,
                                                 int leaf_count,
                                                 unsigned long long *candidates)
@@ -146,6 +221,15 @@ __global__ void generate_node_candidates_kernel(const unsigned long long *corner
     }
 }
 
+/**
+ * @brief Find a node key in a sorted half-open index range.
+ * @return First index whose key is at least key, or last.
+ *
+ * @param keys Sorted device node keys.
+ * @param first First index to search.
+ * @param last Exclusive upper index.
+ * @param key Search threshold.
+ */
 __device__ int lower_bound_node_key(const unsigned long long *keys,
                                     int first,
                                     int last,
@@ -169,6 +253,14 @@ __device__ int lower_bound_node_key(const unsigned long long *keys,
     return first;
 }
 
+/**
+ * @brief Locate the first child of each internal octree node.
+ *
+ * @param node_keys Sorted device node keys with leading level markers.
+ * @param node_count Number of nodes.
+ * @param level_offsets Device array of MAX_DEPTH + 2 level boundaries.
+ * @param child_offsets Output device array of absolute first-child indices; zero denotes a leaf.
+ */
 __global__ void connectivity_kernel(const unsigned long long *node_keys,
                                     int node_count,
                                     const int *level_offsets,
@@ -194,6 +286,15 @@ __global__ void connectivity_kernel(const unsigned long long *node_keys,
     }
 }
 
+/**
+ * @brief Allocate device storage and enqueue a copy from a Thrust device vector.
+ * @return Zero on successful enqueue, otherwise a CUDA error code.
+ * @note The caller must free the allocation, including after a failed copy.
+ *
+ * @param source Device vector to copy.
+ * @param destination Output pointer to a new device allocation owned by the caller.
+ * @param stream CUDA stream for allocation and copying.
+ */
 int copy_vector_to_raw(const thrust::device_vector<unsigned long long> &source,
                        unsigned long long **destination,
                        cudaStream_t stream)
@@ -209,6 +310,15 @@ int copy_vector_to_raw(const thrust::device_vector<unsigned long long> &source,
                       "octree copy");
 }
 
+/**
+ * @brief Allocate device storage and enqueue a copy from a Thrust device vector.
+ * @return Zero on successful enqueue, otherwise a CUDA error code.
+ * @note The caller must free the allocation, including after a failed copy.
+ *
+ * @param source Device vector to copy.
+ * @param destination Output pointer to a new device allocation owned by the caller.
+ * @param stream CUDA stream for allocation and copying.
+ */
 int copy_vector_to_raw(const thrust::device_vector<int> &source,
                        int **destination,
                        cudaStream_t stream)
@@ -224,6 +334,14 @@ int copy_vector_to_raw(const thrust::device_vector<int> &source,
                       "octree copy");
 }
 
+/**
+ * @brief Append the object representation of a value to a host byte buffer.
+ * @tparam T Scalar type stored in the binary file.
+ * @note Serialization uses native byte order.
+ *
+ * @param buffer Host output buffer to extend.
+ * @param value Value whose bytes are appended.
+ */
 template <typename T>
 void append_binary(std::vector<unsigned char> &buffer, const T &value)
 {
@@ -233,6 +351,12 @@ void append_binary(std::vector<unsigned char> &buffer, const T &value)
 }
 }
 
+/**
+ * @brief Enqueue release of the octree device arrays and reset its metadata.
+ *
+ * @param tree Tree to clear.
+ * @param stream CUDA stream used for asynchronous deallocation.
+ */
 void free_distributed_octree_gpu(DistributedGpuOctree &tree,
                                  cudaStream_t stream)
 {
@@ -248,6 +372,21 @@ void free_distributed_octree_gpu(DistributedGpuOctree &tree,
     tree = {};
 }
 
+/**
+ * @brief Construct the same global octree topology on every participating GPU.
+ * @details Particle ownership remains distributed, while the full topology is replicated.
+ * Leaf histograms pass through host memory for MPI_Allreduce. Refinement only splits leaves.
+ * @return Zero on success; nonzero for invalid input, MPI failure, size overflow, or a CUDA error.
+ * @pre All ranks participate with the same ncrit and MAX_DEPTH.
+ * @note Thrust operations may also throw exceptions.
+ *
+ * @param tree Output tree; previous device arrays are released when replaced.
+ * @param d_particles Local device particles, sorted in place.
+ * @param local_particle_count Number of local particles.
+ * @param ncrit Maximum desired global leaf occupancy, except at MAX_DEPTH.
+ * @param stream CUDA stream for tree operations.
+ * @param communicator MPI communicator whose ranks collectively build the tree.
+ */
 int build_global_distributed_octree_gpu(DistributedGpuOctree &tree,
                                         t_particle *d_particles,
                                         int local_particle_count,
@@ -417,6 +556,18 @@ int build_global_distributed_octree_gpu(DistributedGpuOctree &tree,
     return 0;
 }
 
+/**
+ * @brief Write global leaf counts and replicated topology to a version-2 .gtree file.
+ * @return Zero on success; nonzero for invalid input, MPI, CUDA, or file errors.
+ * @pre All ranks participate. Histograms are reduced through host memory.
+ *
+ * @param tree Built tree with the same topology on every rank.
+ * @param d_particles Local device particles sorted by Morton key.
+ * @param local_particle_count Number of local particles.
+ * @param filename Output path opened by rank zero.
+ * @param stream CUDA stream for histogram calculation and copies.
+ * @param communicator MPI communicator for reductions and write-status broadcast.
+ */
 int write_global_distributed_octree_gpu(const DistributedGpuOctree &tree,
                                          const t_particle *d_particles,
                                          int local_particle_count,

@@ -1,3 +1,16 @@
+/**
+ * @file particles_gpu.cu
+ * @brief GPU particle generation, Morton keys, and MPI redistribution.
+ * @details The executable orchestrates this sequence:
+ * 1. box_distribution_kernel(), box_x_gradient_kernel(), or torus_distribution_kernel(): generate coordinates.
+ * 2. generate_keys_kernel(): calculate Morton keys along the Z-order curve.
+ * 3. discover_splitters_gpu(): sort local keys and find global partition boundaries.
+ * 4. redistribute_by_splitters_gpu(): exchange particles between MPI ranks when more than one rank participates.
+ * 5. build_global_distributed_octree_gpu(): optionally build the tree in distributed_octree.cu.
+ * 6. write_par_gpu(): optionally export small particle sets for visualization.
+ *
+ * The executable skips splitter discovery for a single rank when no tree is requested.
+ */
 #include "particles_gpu.hcu"
 
 // GPU particle generation and redistribution.
@@ -16,6 +29,14 @@
         }                                                                                   \
     }
 
+/**
+ * @brief Generate independent uniform coordinates in a cube using Philox.
+ *
+ * @param particles Device array whose coordinate fields are written.
+ * @param N Number of local particles.
+ * @param L Cube side length.
+ * @param seed Philox seed for this rank.
+ */
 __global__ void box_distribution_kernel(t_particle *particles, int N, double L, unsigned long long seed)
 {
     using RNG = r123::Philox4x32;
@@ -32,6 +53,16 @@ __global__ void box_distribution_kernel(t_particle *particles, int N, double L, 
     }
 }
 
+/**
+ * @brief Generate a triangular prism by swapping x and z whenever x < z.
+ * @details The support is 0 <= z <= x <= L, with 0 <= y <= L.
+ * The density is uniform within this wedge; the marginal density increases along x.
+ *
+ * @param particles Device array whose coordinate fields are written.
+ * @param N Number of local particles.
+ * @param L Cube side length.
+ * @param seed Philox seed for this rank.
+ */
 __global__ void box_x_gradient_kernel(t_particle *particles, int N, double L, unsigned long long seed)
 {
     using RNG = r123::Philox4x32;
@@ -57,6 +88,16 @@ __global__ void box_x_gradient_kernel(t_particle *particles, int N, double L, un
     }
 }
 
+/**
+ * @brief Generate torus coordinates from a uniform angle and a sampled circular cross section.
+ *
+ * @param particles Device array whose coordinate fields are written.
+ * @param N Number of local particles.
+ * @param major_r Distance from the torus axis to the tube center.
+ * @param minor_r Tube radius.
+ * @param box_length Box side length; the torus is centered at half this value.
+ * @param seed Philox seed for this rank.
+ */
 __global__ void torus_distribution_kernel(t_particle *particles, int N, double major_r, double minor_r, double box_length, unsigned long long seed)
 {
     using RNG = r123::Philox4x32;
@@ -90,6 +131,15 @@ __global__ void torus_distribution_kernel(t_particle *particles, int N, double m
     }
 }
 
+/**
+ * @brief Calculate Morton keys (Z-order curve) from particle coordinates.
+ * @details Each of MAX_DEPTH levels contributes three bits: x, y, then z.
+ * @pre Coordinates lie inside the domain starting at the origin.
+ *
+ * @param particles Device array; coordinates are read and key fields are written.
+ * @param N Number of local particles.
+ * @param box_length Side length of the coordinate domain.
+ */
 __global__ void generate_keys_kernel(t_particle *particles, int N, double box_length)
 {
     for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < N; i += blockDim.x * gridDim.x)
@@ -136,6 +186,14 @@ __global__ void generate_keys_kernel(t_particle *particles, int N, double box_le
     }
 }
 
+/**
+ * @brief Assign an MPI owner rank to each particle covered by the launch.
+ * @pre The launch provides at least n threads.
+ *
+ * @param p Device particle array to update.
+ * @param n Number of particles.
+ * @param rank_id Owner rank to store.
+ */
 __global__ void set_rank_kernel(t_particle *p, int n, int rank_id)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -143,6 +201,13 @@ __global__ void set_rank_kernel(t_particle *p, int n, int rank_id)
         p[i].mpi_rank = rank_id;
 }
 
+/**
+ * @brief Synchronize one stream on each selected local GPU.
+ * @note This helper changes the current device and performs no MPI barrier.
+ *
+ * @param nprocs Number of local devices, indexed from zero; not the MPI process count.
+ * @param streams Host vector of streams indexed by device.
+ */
 void gpu_barrier(int nprocs, const std::vector<cudaStream_t> &streams)
 {
     for (int d = 0; d < nprocs; ++d)
@@ -152,6 +217,12 @@ void gpu_barrier(int nprocs, const std::vector<cudaStream_t> &streams)
     }
 }
 
+/**
+ * @brief Enable supported peer access between all selected local GPUs.
+ * @note This helper changes the current device.
+ *
+ * @param ndev Number of local devices indexed from zero.
+ */
 void enable_p2p_all(int ndev)
 {
     for (int i = 0; i < ndev; ++i)
@@ -177,6 +248,17 @@ void enable_p2p_all(int ndev)
     }
 }
 
+/**
+ * @brief Find particle offsets that partition sorted keys at the splitters.
+ * @details Uses upper_bound, so keys equal to a splitter stay in the preceding partition.
+ *
+ * @param dev Local CUDA device ordinal.
+ * @param d_ptr Device array sorted by Morton key.
+ * @param n Number of particles.
+ * @param splitters Host vector of ordered inclusive upper bounds.
+ * @param cuts Output host offsets, including zero and n.
+ * @param stream CUDA stream on the selected device.
+ */
 inline void compute_cuts_for_dev(int dev, t_particle *d_ptr, int n, const std::vector<unsigned long long> &splitters, std::vector<int> &cuts, cudaStream_t stream)
 {
     cudaSetDevice(dev);
@@ -204,6 +286,16 @@ inline void compute_cuts_for_dev(int dev, t_particle *d_ptr, int n, const std::v
     cuts.back() = n;
 }
 
+/**
+ * @brief Count keys less than or equal to a threshold on a selected device.
+ * @return Number of matching particles, or zero for an empty array.
+ *
+ * @param dev Local CUDA device ordinal.
+ * @param d_ptr Device array sorted by Morton key.
+ * @param n Number of particles.
+ * @param mid Inclusive key threshold.
+ * @param stream CUDA stream on the selected device.
+ */
 long long count_leq_device(int dev, t_particle *d_ptr, int n, unsigned long long mid, cudaStream_t stream)
 {
     if (n <= 0)
@@ -217,6 +309,15 @@ long long count_leq_device(int dev, t_particle *d_ptr, int n, unsigned long long
     return static_cast<long long>(it - first);
 }
 
+/**
+ * @brief Count keys less than or equal to a threshold on the current device.
+ * @return Number of matching particles, or zero for an empty array.
+ *
+ * @param d_ptr Device array sorted by Morton key.
+ * @param n Number of particles.
+ * @param key Inclusive key threshold.
+ * @param stream CUDA stream for the search.
+ */
 long long count_leq_device2(const t_particle *d_ptr, int n,
                             unsigned long long key, cudaStream_t stream)
 {
@@ -232,12 +333,22 @@ long long count_leq_device2(const t_particle *d_ptr, int n,
 
 struct ExtractKey
 {
+    /**
+     * @brief Read a particle key as an unsigned Morton key.
+     * @param p Particle whose key is read.
+     * @return The unsigned particle key.
+     */
     __host__ __device__ unsigned long long operator()(const t_particle &p) const
     {
         return static_cast<unsigned long long>(p.key);
     }
 };
 
+/**
+ * @brief Print free and total memory on the current CUDA device.
+ *
+ * @param tag Label included in the diagnostic.
+ */
 static inline void dbg_mem(const char *tag)
 {
     size_t f, t;
@@ -245,6 +356,17 @@ static inline void dbg_mem(const char *tag)
     fprintf(stderr, "[MEM] %s: free=%.2f GB total=%.2f GB\n", tag, f / 1e9, t / 1e9);
 }
 
+/**
+ * @brief Sort local particles and find global key quantiles for MPI partitioning.
+ * @details Binary searches combine count_leq_device2() results with MPI_Allreduce.
+ * Repeated keys can prevent exact particle balance.
+ * @pre All ranks in MPI_COMM_WORLD call this routine. The underlying array is writable.
+ *
+ * @param d_rank_array Device particle array, sorted in place despite its const-qualified pointer.
+ * @param lens Number of local particles.
+ * @param stream CUDA stream for sorting and searches.
+ * @param splitters_out Output host vector of nprocs - 1 splitters; empty if no particles exist.
+ */
 void discover_splitters_gpu(const t_particle *d_rank_array, int lens, cudaStream_t stream, std::vector<unsigned long long> &splitters_out)
 {
     int rank, nprocs;
@@ -309,6 +431,18 @@ void discover_splitters_gpu(const t_particle *d_rank_array, int lens, cudaStream
     }
 }
 
+/**
+ * @brief Exchange particles so each MPI rank owns its assigned Morton interval.
+ * @details MPI_Alltoall exchanges counts; chunked MPI_Sendrecv exchanges device buffers.
+ * Received blocks are concatenated and are not necessarily locally sorted.
+ * @pre Input particles are sorted. All ranks participate using CUDA-aware MPI.
+ *
+ * @param d_rank_array Device allocation to update; may be replaced if capacity is insufficient.
+ * @param lens Input local count, replaced with the received count.
+ * @param capacity Allocated particle capacity, updated when storage grows.
+ * @param splitters Host vector of nprocs - 1 ordered inclusive partition bounds.
+ * @param stream CUDA stream for device operations.
+ */
 void redistribute_by_splitters_gpu(t_particle **d_rank_array, int *lens, int *capacity,
                                    const std::vector<unsigned long long> &splitters, cudaStream_t stream)
 {
@@ -423,6 +557,16 @@ void redistribute_by_splitters_gpu(t_particle **d_rank_array, int *lens, int *ca
     DBG_PRINT("After disrank %d: %d\n", rank, *lens);
 }
 
+/**
+ * @brief Gather particle records and write a small debug .par file on rank zero.
+ * @details Output is written in the working directory only when cfg.power < 4.
+ * @pre All ranks in MPI_COMM_WORLD participate. MPI must accept CUDA device buffers.
+ *
+ * @param cfg Execution configuration, including rank count and output size.
+ * @param d_rank_array Local device particle array.
+ * @param lens Number of local particles.
+ * @param gpu_stream CUDA stream synchronized before gathering.
+ */
 void write_par_gpu(const ExecConfig &cfg,
                    t_particle *d_rank_array,
                    int lens,
