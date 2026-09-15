@@ -20,9 +20,9 @@
 
 5.  Run:
 
-        mpirun -np <number_of_processes> ./build./src/p_sfc_exe <distribution_name> <power_particles> <seed> <mode>
+        mpirun -np <number_of_processes> ./build/src/p_sfc_exe <distribution_name> <power_particles> <seed> <mode>
         
-        mpirun -np <number_of_processes> ./build./src/gpu_mpi_p_sfc_exe <distribution_name> <power_particles> <seed> <mode>
+        mpirun -np <number_of_processes> ./build/src/gpu_mpi_p_sfc_exe <distribution_name> <power_particles> <seed> <mode>
    
 6. See Results (Only if power_particles < 4):
 
