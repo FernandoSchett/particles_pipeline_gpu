@@ -28,10 +28,22 @@ def read_binary(filename):
 
     return particle_count, rank_array, coord_array
 
-particle_files = sorted(BUILD_DIR.glob("particle_file*"))
+search_dirs = {Path.cwd().resolve(), PROJECT_ROOT, BUILD_DIR}
+particle_files = sorted({
+    path.resolve()
+    for directory in search_dirs
+    for path in directory.glob("particle_file*.par")
+})
+if not particle_files:
+    raise SystemExit(
+        "No particle files found. Searched: "
+        + ", ".join(str(directory) for directory in sorted(search_dirs))
+        + ". Run the particle executable with power < 4 to generate .par files."
+    )
 
 for par_file in particle_files:
     particle_count, rank_array, coord_array = read_binary(par_file)
+    print(f"Plotting {par_file}: {particle_count} particles", flush=True)
     unique_ranks = np.unique(rank_array).astype(int)
 
     fig = plt.figure(figsize=(10,6))
