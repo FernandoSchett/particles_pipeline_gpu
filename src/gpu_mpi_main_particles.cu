@@ -34,6 +34,8 @@ void parse_args(int argc, char **argv, ExecConfig &cfg)
             cfg.dist_type = DIST_BOX;
         else if (strcmp(argv[1], "torus") == 0)
             cfg.dist_type = DIST_TORUS;
+        else if (strcmp(argv[1], "triangle") == 0)
+            cfg.dist_type = DIST_TRIANGLE;
     }
     if (cfg.dist_type == DIST_UNKNOWN)
         cfg.dist_type = DIST_BOX;
@@ -105,6 +107,9 @@ int main(int argc, char **argv)
     {
     case DIST_BOX:
         box_distribution_kernel<<<grid, block, 0, gpu_stream>>>(d_rank_array, cfg.length_per_rank, cfg.box_length, cfg.seed + cfg.rank);
+        break;
+    case DIST_TRIANGLE:
+        box_x_gradient_kernel<<<grid, block, 0, gpu_stream>>>(d_rank_array, cfg.length_per_rank, cfg.box_length, cfg.seed + cfg.rank);
         break;
     case DIST_TORUS:
         torus_distribution_kernel<<<grid, block, 0, gpu_stream>>>(d_rank_array, cfg.length_per_rank, cfg.major_r, cfg.minor_r, cfg.box_length, cfg.seed + cfg.rank);

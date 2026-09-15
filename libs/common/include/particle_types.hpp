@@ -24,6 +24,7 @@ typedef enum
 {
   DIST_BOX,
   DIST_TORUS,
+  DIST_TRIANGLE,
   DIST_UNKNOWN
 } dist_type_t;
 
