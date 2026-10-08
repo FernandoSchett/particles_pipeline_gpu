@@ -2,7 +2,7 @@
 
 #include <cstdlib>
 
-MPI_Datatype MPI_particle;
+MPI_Datatype MPI_particle, MPI_particle_data, MPI_particle_results, MPI_particle_pepc;
 
 int register_MPI_Particle(MPI_Datatype *MPI_Particle)
 {
@@ -100,6 +100,160 @@ int parallel_write_to_file(t_particle *particle_array, int *count, char *filenam
 
     MPI_File_close(&fh);
     return 0;
+}
+
+int register_MPI_particle_data(MPI_Datatype *MPI_Particle_data)
+{
+    int blocklengths[NPROPS_PEPC_PARTICLE_DATA] = {1, 3, 1, 3, 3, 3, 1, 1, 1};
+    MPI_Datatype array_types[NPROPS_PEPC_PARTICLE_DATA] = {MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, \
+                                                           MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, \
+                                                           MPI_INT, MPI_INT, MPI_DOUBLE};
+    t_pepc_particle_data dummy_particle_data[2];
+    MPI_Aint address[NPROPS_PEPC_PARTICLE_DATA + 1], displacements[NPROPS_PEPC_PARTICLE_DATA], extent_add;
+
+    MPI_Get_address(&dummy_particle_data[0], &address[0]);
+    MPI_Get_address(&dummy_particle_data[0].q, &address[1]);
+    MPI_Get_address(&dummy_particle_data[0].v, &address[2]);
+    MPI_Get_address(&dummy_particle_data[0].m, &address[3]);
+    MPI_Get_address(&dummy_particle_data[0].b, &address[4]);
+    MPI_Get_address(&dummy_particle_data[0].f_e, &address[5]);
+    MPI_Get_address(&dummy_particle_data[0].f_b, &address[6]);
+    MPI_Get_address(&dummy_particle_data[0].species, &address[7]);
+    MPI_Get_address(&dummy_particle_data[0].mp_int1, &address[8]);
+    MPI_Get_address(&dummy_particle_data[0].age, &address[9]);
+
+    for (int i = 0; i < NPROPS_PEPC_PARTICLE_DATA; i++)
+        displacements[i] = address[i + 1] - address[0];
+
+    MPI_Datatype tmp;
+    MPI_Type_create_struct(NPROPS_PEPC_PARTICLE_DATA, blocklengths, displacements, array_types, &tmp);
+
+    MPI_Get_address(&dummy_particle_data[1], &extent_add);
+    extent_add -= address[0];
+
+    MPI_Type_create_resized(tmp, 0, extent_add, MPI_Particle_data);
+    MPI_Type_free(&tmp);
+    MPI_Type_commit(MPI_Particle_data);
+    return 0;
+}
+
+int register_MPI_particle_results(MPI_Datatype *MPI_Particle_results)
+{
+    int blocklengths[NPROPS_PEPC_PARTICLE_RESULTS] = {3, 1};
+    MPI_Datatype array_types[NPROPS_PEPC_PARTICLE_RESULTS] = {MPI_DOUBLE, MPI_DOUBLE};
+
+    t_pepc_particle_results dummy_particle_results[2];
+    MPI_Aint address[NPROPS_PEPC_PARTICLE_RESULTS + 1], displacements[NPROPS_PEPC_PARTICLE_RESULTS], extent_add;
+
+    MPI_Get_address(&dummy_particle_results[0], &address[0]);
+    MPI_Get_address(&dummy_particle_results[0].e, &address[1]);
+    MPI_Get_address(&dummy_particle_results[0].pot, &address[2]);
+
+    for (int i = 0; i < NPROPS_PEPC_PARTICLE_RESULTS; i++)
+        displacements[i] = address[i + 1] - address[0];
+
+    MPI_Datatype tmp;
+    MPI_Type_create_struct(NPROPS_PEPC_PARTICLE_RESULTS, blocklengths, displacements, array_types, &tmp);
+
+    MPI_Get_address(&dummy_particle_results[1], &extent_add);
+    extent_add -= address[0];
+
+    MPI_Type_create_resized(tmp, 0, extent_add, MPI_Particle_results);
+    MPI_Type_free(&tmp);
+    MPI_Type_commit(MPI_Particle_results);
+    return 0;
+}
+
+int register_MPI_Particle_pepc(MPI_Datatype *MPI_Particle_pepc)
+{
+    register_MPI_particle_results(&MPI_particle_results);
+    register_MPI_particle_data(&MPI_particle_data);
+    int blocklengths[NPROPS_PEPC_PARTICLE] = {3, 1, 1, 1, 1, 1, 1};
+    MPI_Datatype array_types[NPROPS_PEPC_PARTICLE] = {MPI_DOUBLE, MPI_DOUBLE, MPI_LONG_LONG_INT, \
+                                                      MPI_LONG_LONG_INT, MPI_LONG_LONG_INT, \
+                                                      MPI_particle_data, MPI_particle_results};
+    t_pepc_particle dummy_particle_pepc[2];
+    MPI_Aint address[NPROPS_PEPC_PARTICLE + 1], displacements[NPROPS_PEPC_PARTICLE], extent_add;
+
+    MPI_Get_address(&dummy_particle_pepc[0], &address[0]);
+    MPI_Get_address(&dummy_particle_pepc[0].x, &address[1]);
+    MPI_Get_address(&dummy_particle_pepc[0].work, &address[2]);
+    MPI_Get_address(&dummy_particle_pepc[0].key, &address[3]);
+    MPI_Get_address(&dummy_particle_pepc[0].node_leaf, &address[4]);
+    MPI_Get_address(&dummy_particle_pepc[0].label, &address[5]);
+    MPI_Get_address(&dummy_particle_pepc[0].data, &address[6]);
+    MPI_Get_address(&dummy_particle_pepc[0].results, &address[7]);
+
+    for (int i = 0; i < NPROPS_PEPC_PARTICLE; i++)
+        displacements[i] = address[i + 1] - address[0];
+
+    MPI_Datatype tmp;
+    MPI_Type_create_struct(NPROPS_PEPC_PARTICLE, blocklengths, displacements, array_types, &tmp);
+
+    MPI_Get_address(&dummy_particle_pepc[1], &extent_add);
+    extent_add -= address[0];
+
+    MPI_Type_create_resized(tmp, 0, extent_add, MPI_Particle_pepc);
+    MPI_Type_free(&tmp);
+    MPI_Type_commit(MPI_Particle_pepc);
+    return 0;
+}
+
+int parallel_read_pepc_particles(MPI_Comm comm, t_pepc_particle **pepc_array, \
+                                 char *filename, int64_t *n_total, int64_t *n_local)
+{
+    MPI_File fh;
+    MPI_Status status;
+    int comm_size, comm_rank;
+    int dummy;
+    int64_t particles_remainder;
+    int64_t setView_offset = 0;
+    int64_t total_p, local_p;
+    register_MPI_Particle_pepc(&MPI_particle_pepc);
+
+    MPI_Comm_size(comm, &comm_size);
+    MPI_Comm_rank(comm, &comm_rank);
+
+    std::ifstream fin(filename);
+    if (!fin) {
+        std::cerr << "Can't open file, check if it exists.\n" << std::endl;
+        return 1;
+    }
+
+    MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_RDONLY, MPI_INFO_NULL, &fh);
+    MPI_File_set_view(fh, 0, MPI_BYTE, MPI_BYTE, "native", MPI_INFO_NULL);
+    MPI_File_read(fh, &total_p, 1, MPI_INT64_T, &status);
+    MPI_File_read(fh, &dummy, 1, MPI_INT, &status);
+
+    local_p = total_p/comm_size;
+    particles_remainder = total_p%comm_size;
+    if (comm_rank < particles_remainder) local_p += 1;
+
+    *pepc_array = (t_pepc_particle *)malloc(local_p*sizeof(t_pepc_particle));
+
+    setView_offset = 128;
+    MPI_File_set_view(fh, setView_offset, MPI_particle_pepc, MPI_particle_pepc, "native", MPI_INFO_NULL);
+    MPI_File_read_ordered(fh, (*pepc_array), local_p, MPI_particle_pepc, &status);
+    MPI_File_close(&fh);
+
+    *n_total = total_p;
+    *n_local = local_p;
+    return 0;
+}
+
+void pepc_to_simple_particle_array(int rank, t_pepc_particle **pepc_array, t_particle **particle_array, int64_t n_local)
+{
+// NOTE: intended to be called by all MPI rank.
+    *particle_array = (t_particle *)malloc(n_local*sizeof(t_particle));
+
+    for (int64_t i = 0; i < n_local; i++)
+    {
+       (*particle_array)[i].mpi_rank = rank;
+       (*particle_array)[i].key = (*pepc_array)[i].key;
+       (*particle_array)[i].coord[0] = (*pepc_array)[i].x[0];
+       (*particle_array)[i].coord[1] = (*pepc_array)[i].x[1];
+       (*particle_array)[i].coord[2] = (*pepc_array)[i].x[2];
+    }
 }
 
 int serial_write_to_file(t_particle *particle_array, int count, char *filename)

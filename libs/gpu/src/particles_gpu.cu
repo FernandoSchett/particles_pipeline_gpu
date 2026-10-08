@@ -202,6 +202,55 @@ __global__ void set_rank_kernel(t_particle *p, int n, int rank_id)
 }
 
 /**
+ * @brief Prints particle coords from device-allocated t_particle array.
+ *
+ * @param p Particle array on device to print (in).
+ * @param n Number of particles (in).
+ * @param rank_id Owner rank (in).
+ */
+__global__ void print_particle_gpu(t_particle *p, int n, int rank_id)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    //if (i == 0) printf("gridDim.x: %d, blockDim.x: %d\n", gridDim.x, blockDim.x);
+    if (i < n)
+        printf("Rank: %d p[%d].coord: %f, %f, %f\n", rank_id, i, p[i].coord[0], p[i].coord[1], p[i].coord[2]);
+}
+
+/**
+ * @brief Opens provided PEPC particles file, converts PEPC particle type to t_particle, then populates device buffer.
+ * @details device_array is reallocated via cudaMalloc within this function, and filled with particle coordinates from PEPC file.
+ *
+ * @param comm MPI communicator of participating MPI processes (in).
+ * @param filename Filename of the PEPC particles file (in).
+ * @param device_array Array that will be populated with PEPC particle coordinates (inout).
+ * @param n_total Global particles count (out).
+ * @param n_total Particles count per device (out).
+ * @param cfg Simulation configurations (in).
+ * @param stream CUDA gpu stream for potential async operations(in).
+ */
+void pepc_distribution(MPI_Comm comm, char *filename, t_particle **device_array, int64_t *n_total, int64_t *n_local, ExecConfig cfg, cudaStream_t stream)
+{
+    t_pepc_particle *pepc_array;
+    t_particle *particle_array;
+    int64_t temp_total, temp_local;
+
+    cudaFree(*device_array);
+    parallel_read_pepc_particles(comm, &pepc_array, filename, &temp_total, &temp_local);
+
+    pepc_to_simple_particle_array(cfg.rank, &pepc_array, &particle_array, temp_local);
+    free(pepc_array);
+
+    //printf("temp_local %lld\n ", temp_local);
+    //printf("rank %d p_cpu[0].coords: %f %f %f\n", cfg.rank, particle_array[0].coord[0], particle_array[0].coord[1], particle_array[0].coord[2]);
+    cudaMalloc(device_array, (size_t)temp_local*sizeof(t_particle));
+    cudaMemcpy(*device_array, particle_array, (size_t)temp_local*sizeof(t_particle), cudaMemcpyHostToDevice);
+    free(particle_array);
+
+    *n_total = temp_total;
+    *n_local = temp_local;
+}
+
+/**
  * @brief Synchronize one stream on each selected local GPU.
  * @note This helper changes the current device and performs no MPI barrier.
  *

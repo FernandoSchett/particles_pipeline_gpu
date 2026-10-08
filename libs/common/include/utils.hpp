@@ -13,6 +13,8 @@
 
 void print_particles(t_particle *particle_array, int size, int rank);
 
+void print_pepc_particles(t_pepc_particle *particle_array, int size, int rank);
+
 void setup_particles_box_length(ExecConfig &cfg);
 
 void log_results(const ExecConfig &cfg, const exec_times &times, const char *results_path);

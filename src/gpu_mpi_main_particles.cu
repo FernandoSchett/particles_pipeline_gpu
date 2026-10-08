@@ -36,6 +36,8 @@ void parse_args(int argc, char **argv, ExecConfig &cfg)
             cfg.dist_type = DIST_TORUS;
         else if (strcmp(argv[1], "triangle") == 0)
             cfg.dist_type = DIST_TRIANGLE;
+        else if (strcmp(argv[1], "pepc_shape") == 0)
+            cfg.dist_type = DIST_PEPC;
     }
     if (cfg.dist_type == DIST_UNKNOWN)
         cfg.dist_type = DIST_BOX;
@@ -103,6 +105,8 @@ int main(int argc, char **argv)
     if (grid > maxBlocks)
         grid = maxBlocks;
 
+    int64_t n_total, n_local;
+
     switch (cfg.dist_type)
     {
     case DIST_BOX:
@@ -113,6 +117,19 @@ int main(int argc, char **argv)
         break;
     case DIST_TORUS:
         torus_distribution_kernel<<<grid, block, 0, gpu_stream>>>(d_rank_array, cfg.length_per_rank, cfg.major_r, cfg.minor_r, cfg.box_length, cfg.seed + cfg.rank);
+        break;
+    case DIST_PEPC:
+        pepc_distribution(MPI_COMM_WORLD, "./particles/mpi/particle_000000000001.mpi", &d_rank_array, &n_total, &n_local, cfg, gpu_stream);
+        cfg.length_per_rank = (int)n_local;
+        capacity = cfg.length_per_rank;
+/*
+        maxBlocks = sms * 20;
+        grid = (cfg.length_per_rank + block - 1) / block;
+        if (grid > maxBlocks)
+            grid = maxBlocks;
+
+        print_particle_gpu<<<grid, block>>>(d_rank_array, n_local, cfg.rank);
+*/
         break;
     default:
         break;

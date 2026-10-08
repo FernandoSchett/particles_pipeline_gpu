@@ -20,11 +20,42 @@ typedef struct particle
   double coord[3];
 } t_particle;
 
+typedef struct
+{
+  double q;
+  double v[3];
+  double m;
+  double b[3];
+  double f_e[3];
+  double f_b[3];
+  int species;
+  int mp_int1;
+  double age;
+} t_pepc_particle_data;
+
+typedef struct
+{
+  double e[3];
+  double pot;
+} t_pepc_particle_results;
+
+typedef struct
+{
+  double x[3];
+  double work;
+  int64_t key;
+  int64_t node_leaf;
+  int64_t label;
+  t_pepc_particle_data data;
+  t_pepc_particle_results results;
+} t_pepc_particle;
+
 typedef enum
 {
   DIST_BOX,
   DIST_TORUS,
   DIST_TRIANGLE,
+  DIST_PEPC,
   DIST_UNKNOWN
 } dist_type_t;
 
@@ -69,6 +100,9 @@ typedef struct
 } exec_times;
 
 #define NPROPS_PARTICLE 3
+#define NPROPS_PEPC_PARTICLE_DATA 9
+#define NPROPS_PEPC_PARTICLE_RESULTS 2
+#define NPROPS_PEPC_PARTICLE 7
 #define MAX_DEPTH 15
 #define DEFAULT_SEED 24
 
