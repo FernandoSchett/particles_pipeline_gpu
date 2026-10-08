@@ -24,6 +24,21 @@ void print_particles(t_particle *particle_array, int size, int rank)
     }
 }
 
+void print_pepc_particles(t_pepc_particle *particle_array, int size, int rank)
+{
+    for (int i = 0; i < size; i++)
+    {
+        printf("P_rank: %d, %f, %f, %f, m: %f ",
+               rank,
+               particle_array[i].x[0],
+               particle_array[i].x[1],
+               particle_array[i].x[2],
+               particle_array[i].data.m);
+
+        printf("\n");
+    }
+}
+
 void setup_particles_box_length(ExecConfig &cfg)
 {
     const long long base = static_cast<long long>(std::pow(10.0, cfg.power));
