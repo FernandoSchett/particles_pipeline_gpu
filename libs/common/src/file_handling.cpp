@@ -200,7 +200,7 @@ int register_MPI_Particle_pepc(MPI_Datatype *MPI_Particle_pepc)
 }
 
 int parallel_read_pepc_particles(MPI_Comm comm, t_pepc_particle **pepc_array, \
-                                 char *filename, int64_t *n_total, int64_t *n_local)
+                                 const char *filename, int64_t *n_total, int64_t *n_local)
 {
     MPI_File fh;
     MPI_Status status;
@@ -215,12 +215,14 @@ int parallel_read_pepc_particles(MPI_Comm comm, t_pepc_particle **pepc_array, \
     MPI_Comm_rank(comm, &comm_rank);
 
     std::ifstream fin(filename);
-    if (!fin) {
+    int missing = !fin;
+    MPI_Allreduce(MPI_IN_PLACE, &missing, 1, MPI_INT, MPI_MAX, comm);
+    if (missing) {
         std::cerr << "Can't open file, check if it exists.\n" << std::endl;
         return 1;
     }
 
-    MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_RDONLY, MPI_INFO_NULL, &fh);
+    MPI_File_open(comm, filename, MPI_MODE_RDONLY, MPI_INFO_NULL, &fh);
     MPI_File_set_view(fh, 0, MPI_BYTE, MPI_BYTE, "native", MPI_INFO_NULL);
     MPI_File_read(fh, &total_p, 1, MPI_INT64_T, &status);
     MPI_File_read(fh, &dummy, 1, MPI_INT, &status);
