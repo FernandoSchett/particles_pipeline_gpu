@@ -10,4 +10,7 @@ scripts/*jwc
 scripts/core.jwb*.juwels.*
 .venv/
 *.tree
+*.gtree
+results_strong.csv
+results_weak.csv
 __pycache__/
