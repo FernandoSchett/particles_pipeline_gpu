@@ -1,20 +1,74 @@
-| Item                  | Description                                                                 |
-|-----------------------|-----------------------------------------------------------------------------|
-| `build/`              | Compiled output directory (CMake build artifacts, binaries, object files). |
-| `docs/`               | Documentation files for the project (design notes, reports, references).   |
-| `py_apps/`            | Python applications for result analysis and particle visualization.         |
-| `py_apps/gen_results.py` | Reads experiment CSVs and generates scaling plots under `results/`.       |
-| `py_apps/visualise.py` | Reads particle binaries from `build/` and displays interactive 3D plots.    |
-| `py_apps/verify_par_file.py` | Validates ordering and load balance in particle `.par` files.          |
-| `py_apps/verify_tree_file.py` | Validates topology and particle coverage in hashed oct-tree files.    |
-| `gen_results.ipynb`   | Jupyter notebook for generating and analyzing results interactively.        |
-| `gen_results_save.ipynb` | Jupyter notebook variant for saving experiment outputs and figures.      |
-| `libs/`               | Project libraries (helper modules, reusable code for CPU/GPU, utilities).  |
-| `requirements.txt`    | Python dependencies for analysis/visualization scripts.                     |
-| `scripts/`            | Bash/Slurm scripts to launch experiments on clusters.                       |
-| `tests/`              | Unit tests and validation cases for core components.                        |
-| `CMakeLists.txt`      | Main build configuration (CMake project definition and linking).            |
-| `README.md`           | Project overview and usage instructions.                                    |
-| `results/`            | Collected experiment outputs (CSV logs, runtime data).                      |
-| `src/`                | Main C++ source code (simulation kernels, MPI+CUDA execution, algorithms).  |
-| `third_party/`        | External dependencies included in the repository.                           |
+# Project structure
+
+```text
+particles_pipeline_gpu/
+├── .env                         # CUDA compiler path (CUDACXX)
+├── CMakeLists.txt               # Dependencies, build options, and CTest
+├── README.md                    # Build and execution instructions
+├── requirements.txt             # Python dependencies
+├── src/
+│   ├── CMakeLists.txt
+│   ├── cpu_main_particles.cpp   # CPU + MPI pipeline entry point
+│   └── gpu_mpi_main_particles.cu # CUDA + MPI pipeline entry point
+├── libs/
+│   ├── CMakeLists.txt           # Library subdirectories and target aliases
+│   ├── common/
+│   │   ├── CMakeLists.txt
+│   │   ├── include/            # Shared types, I/O, domain, logging, and utilities
+│   │   ├── src/                # Particle I/O, PEPC reader, domain fitting, CSV logging
+│   │   └── tests/
+│   │       └── particle_domain_tests.cpp
+│   ├── cpu/
+│   │   ├── CMakeLists.txt
+│   │   ├── include/            # CPU particles and hashed octree interfaces
+│   │   ├── src/                # Generation, Morton partitioning, distributed hashed octree
+│   │   └── tests/
+│   │       ├── CMakeLists.txt
+│   │       └── distributed_hashed_octree_tests.cpp
+│   └── gpu/
+│       ├── CMakeLists.txt
+│       ├── include/            # CUDA particle and octree interfaces (.hcu)
+│       └── src/                # Particle kernels, PEPC upload, MPI exchange, cornerstone octree
+├── scripts/
+│   ├── compile.sh              # Load .env and rebuild project
+│   ├── setup_py_env.sh         # Create Python environment and install dependencies
+│   ├── load_modules_cpu.sh     # Cluster modules for CPU execution
+│   ├── load_modules_gpu.sh     # Cluster modules for GPU execution
+│   ├── run_all_jobs.sh         # Build and submit CPU/GPU experiments
+│   ├── run_cpu_jobs.sh         # Submit CPU scaling jobs through Slurm
+│   ├── run_gpu_jobs.sh         # Submit GPU scaling jobs through Slurm
+│   ├── run_cpu_experiment.sh   # Repeat CPU executions
+│   ├── run_gpu_experiment.sh   # Repeat GPU executions
+│   └── tests/                  # Slurm test launchers and output validation
+├── py_apps/
+│   ├── gen_results.py          # Scaling plots from experiment CSVs
+│   ├── visualise.py            # Interactive particle plots
+│   ├── tree_visualise.py       # CPU hashed octree visualization
+│   ├── verify_par_file.py      # Particle ordering and load balance checks
+│   ├── verify_tree_file.py     # CPU tree topology and coverage checks
+│   └── verify_global_tree_file.py # GPU cornerstone and topology checks
+├── docs/
+│   ├── structure.md            # This directory map
+│   └── tree_construction.pdf   # Tree construction reference
+├── results/
+│   ├── strong/                # Strong-scaling figures
+│   ├── weak/                  # Weak-scaling figures
+│   └── particles/mpi/          # PEPC input snapshot and parameter file
+├── third_party/
+│   ├── CMakeLists.txt
+│   └── random123/             # Random123 submodule for particle generation
+└── build/                     # Generated CMake files, libraries, executables, and tests
+```
+
+## Build outputs and data files
+
+- `build/src/p_sfc_exe`: CPU executable.
+- `build/src/gpu_mpi_p_sfc_exe`: GPU executable, enabled by `P_SFC_BUILD_GPU`.
+- `libs/common/tests/` and `libs/cpu/tests/`: C++ tests registered with CTest when `BUILD_TESTING` is enabled.
+- `scripts/tests/`: cluster execution scripts; these also run Python validators on generated files.
+- `.par`, `.tree`, and `.gtree`: particle, CPU tree, and GPU tree debug outputs written to the execution directory.
+- `visualise.py` searches the project root, `build/`, and the current working directory for `particle_file*.par`.
+- `results_strong.csv` and `results_weak.csv`: timing logs written one directory above the execution directory. `gen_results.py` expects them in the project root.
+- `results/particles/mpi/particle_000000000001.mpi`: bundled PEPC snapshot with 10,000 particles. Its `.mpi.h` companion contains PEPC parameters in text form, not a C++ header.
+
+The shared implementation lives in `libs/common/`; CPU and GPU algorithms live in their respective libraries. The obsolete `libs/helper/` directory has been removed.
