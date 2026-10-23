@@ -13,6 +13,8 @@ mkdir -p "$P_SFC_OUTPUT_DIR"
 P_SFC_OUTPUT_DIR="$(cd "$P_SFC_OUTPUT_DIR" && pwd)"
 source ../load_modules_gpu.sh
 
+export P_SFC_VERIFY_REPLICAS=1
+
 DISTS=(pepc_shape)
 SEEDS=(67)
 PP="${PP:-3}"
@@ -58,3 +60,16 @@ for dist in "${DISTS[@]}"; do
     done
   done
 done
+
+# Exercise small adversarial inputs with the real binary in the same allocation.
+if [[ "${RUN_EDGE_CASES:-1}" == 1 ]]; then
+    edge_np=$(( MAX_NP < 4 ? MAX_NP : 4 ))
+    edge_nodes=$(( (edge_np + GPU_PER_NODE - 1) / GPU_PER_NODE ))
+    edge_tasks=$(( edge_np < GPU_PER_NODE ? edge_np : GPU_PER_NODE ))
+    "${PYTHON:-python3}" "$PROJECT_ROOT/py_apps/run_tree_correctness.py" \
+        --device gpu --executable "$PROJECT_ROOT/build/src/gpu_mpi_p_sfc_exe" \
+        --ranks "$edge_np" --launcher srun --rank-flag=-n \
+        --launcher-arg="--nodes=$edge_nodes" --launcher-arg="--ntasks-per-node=$edge_tasks" \
+        --launcher-arg=--gpus-per-task=1 \
+        --output-dir "$P_SFC_OUTPUT_DIR/edge_cases"
+fi

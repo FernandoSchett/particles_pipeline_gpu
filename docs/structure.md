@@ -46,9 +46,13 @@ particles_pipeline_gpu/
 │   ├── tree_visualise.py       # CPU hashed octree visualization
 │   ├── verify_par_file.py      # Particle ordering and load balance checks
 │   ├── verify_tree_file.py     # CPU tree topology and coverage checks
+│   ├── tree_reference.py       # Independent CPU/GPU trees and particle cross-checks
+│   ├── run_tree_correctness.py # MPI end-to-end tests with PEPC edge-case fixtures
+│   ├── tests/                 # Validator tests, including deliberate corruption
 │   └── verify_global_tree_file.py # GPU cornerstone and topology checks
 ├── docs/
 │   ├── structure.md            # This directory map
+│   ├── tree_correctness.md     # Correctness coverage and execution commands
 │   └── tree_construction.pdf   # Tree construction reference
 ├── results/
 │   ├── debug/                 # Direct-run particle/tree files and timing CSVs (generated)

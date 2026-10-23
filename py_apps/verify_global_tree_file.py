@@ -3,6 +3,7 @@ import argparse
 from pathlib import Path
 import struct
 import sys
+from tree_reference import read_particles, check_conservation, check_gpu_particles
 
 MAGIC = b"PSFCGTRE"
 VERSION = 2
@@ -31,7 +32,7 @@ def validate(path):
             raise ValueError(f"invalid magic: {magic!r}")
         if version != VERSION:
             raise ValueError(f"unsupported version: {version}")
-        if max_depth < 1 or ncrit < 1 or rank_count < 1 or leaves < 1 or nodes < 1:
+        if not 1 <= max_depth <= 20 or ncrit < 1 or rank_count < 1 or leaves < 1 or nodes < 1:
             raise ValueError("invalid tree dimensions")
 
         cornerstone = read_values(stream, struct.Struct("<Q"), leaves + 1, "cornerstone")
@@ -72,6 +73,9 @@ def validate(path):
         if any(node_level(key) != level for key in node_keys[first:last]):
             raise ValueError(f"level {level} contains key with wrong placeholder level")
 
+    for key in node_keys:
+        if key != 1 and key >> 3 not in key_to_index:
+            raise ValueError(f"orphan GPU node {key}")
     internal_count = 0
     for index, (key, child) in enumerate(zip(node_keys, child_offsets)):
         if child == 0:
@@ -112,9 +116,20 @@ def validate(path):
 def main():
     parser = argparse.ArgumentParser(description="Validate distributed GPU octree .gtree file")
     parser.add_argument("treefile", type=Path)
+    parser.add_argument("--particles", type=Path, help="matching .par file for independent reference checks")
+    source = parser.add_mutually_exclusive_group()
+    source.add_argument("--input-pepc", type=Path, help="original PEPC file for conservation and coordinate/key checks")
+    source.add_argument("--before-par", type=Path, help="particle dump before MPI redistribution")
     args = parser.parse_args()
+    if (args.input_pepc or args.before_par) and not args.particles:
+        parser.error("conservation checks require --particles")
     try:
         tree = validate(args.treefile)
+        if args.particles:
+            particles = read_particles(args.particles)
+            check_conservation(particles, args.before_par, args.input_pepc, tree['max_depth'])
+            check_gpu_particles(tree, particles)
+            print("GPU particle intervals, partition ownership and recursive reference: OK")
     except (OSError, ValueError, struct.error) as error:
         print(f"FAIL: {error}", file=sys.stderr)
         return 1

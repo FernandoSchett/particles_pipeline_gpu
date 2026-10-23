@@ -22,6 +22,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <cstdlib>
 #include <limits>
 #include <vector>
 
@@ -556,6 +557,65 @@ int build_global_distributed_octree_gpu(DistributedGpuOctree &tree,
     return 0;
 }
 
+namespace
+{
+/**
+ * @brief Compare a device array exactly against rank zero using bounded host buffers.
+ * @param device Local device array.
+ * @param count Number of elements, identical across ranks.
+ * @param datatype MPI datatype matching T.
+ * @param stream Stream on which the tree was built.
+ * @param communicator Ranks holding the replicated topology.
+ * @return Zero for identical arrays; nonzero for copy errors or a mismatch.
+ */
+template <typename T>
+int compare_replica_array(const T *device, std::size_t count, MPI_Datatype datatype,
+                          cudaStream_t stream, MPI_Comm communicator)
+{
+    constexpr std::size_t chunk_size = 65536;
+    for (std::size_t offset = 0; offset < count; offset += chunk_size)
+    {
+        const int length = static_cast<int>(std::min(chunk_size, count - offset));
+        std::vector<T> local(length), reference(length);
+        int failed = cudaMemcpyAsync(local.data(), device + offset, length * sizeof(T),
+                                     cudaMemcpyDeviceToHost, stream) != cudaSuccess;
+        failed |= cudaStreamSynchronize(stream) != cudaSuccess;
+        MPI_Allreduce(MPI_IN_PLACE, &failed, 1, MPI_INT, MPI_MAX, communicator);
+        if (failed)
+            return 1;
+        reference = local;
+        MPI_Bcast(reference.data(), length, datatype, 0, communicator);
+        failed = local != reference;
+        MPI_Allreduce(MPI_IN_PLACE, &failed, 1, MPI_INT, MPI_MAX, communicator);
+        if (failed)
+            return 1;
+    }
+    return 0;
+}
+
+/** @brief Check all replicated arrays during opt-in correctness runs. */
+int check_tree_replicas(const DistributedGpuOctree &tree, cudaStream_t stream,
+                        MPI_Comm communicator)
+{
+    int dimensions[4] = {tree.leaf_count, tree.node_count, tree.max_depth, tree.ncrit};
+    int lower[4], upper[4];
+    MPI_Allreduce(dimensions, lower, 4, MPI_INT, MPI_MIN, communicator);
+    MPI_Allreduce(dimensions, upper, 4, MPI_INT, MPI_MAX, communicator);
+    if (!std::equal(lower, lower + 4, upper))
+        return 1;
+    if (compare_replica_array(tree.d_cornerstone, static_cast<std::size_t>(tree.leaf_count) + 1,
+                              MPI_UNSIGNED_LONG_LONG, stream, communicator) ||
+        compare_replica_array(tree.d_node_keys, tree.node_count,
+                              MPI_UNSIGNED_LONG_LONG, stream, communicator) ||
+        compare_replica_array(tree.d_child_offsets, tree.node_count,
+                              MPI_INT, stream, communicator) ||
+        compare_replica_array(tree.d_level_offsets, tree.max_depth + 2,
+                              MPI_INT, stream, communicator))
+        return 1;
+    return 0;
+}
+}
+
 /**
  * @brief Write global leaf counts and replicated topology to a version-2 .gtree file.
  * @return Zero on success; nonzero for invalid input, MPI, CUDA, or file errors.
@@ -578,11 +638,22 @@ int write_global_distributed_octree_gpu(const DistributedGpuOctree &tree,
     constexpr char magic[8] = {'P', 'S', 'F', 'C', 'G', 'T', 'R', 'E'};
     constexpr std::uint32_t version = 2;
 
-    if (!filename || tree.leaf_count < 1 || tree.node_count < 1 ||
+    int invalid = !filename || tree.leaf_count < 1 || tree.node_count < 1 ||
         !tree.d_cornerstone || !tree.d_node_keys || !tree.d_child_offsets ||
         !tree.d_level_offsets || local_particle_count < 0 ||
-        (local_particle_count > 0 && !d_particles))
+        (local_particle_count > 0 && !d_particles);
+    MPI_Allreduce(MPI_IN_PLACE, &invalid, 1, MPI_INT, MPI_MAX, communicator);
+    if (invalid)
         return 1;
+
+    const char *verify = std::getenv("P_SFC_VERIFY_REPLICAS");
+    int verify_replicas = verify && std::strcmp(verify, "1") == 0;
+    MPI_Allreduce(MPI_IN_PLACE, &verify_replicas, 1, MPI_INT, MPI_MAX, communicator);
+    if (verify_replicas && check_tree_replicas(tree, stream, communicator) != 0)
+    {
+        std::fprintf(stderr, "GPU octree replicas differ or could not be read.\n");
+        return 4;
+    }
 
     int rank = 0;
     int rank_count = 1;

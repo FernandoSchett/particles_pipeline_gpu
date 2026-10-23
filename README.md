@@ -81,6 +81,9 @@ ctest --test-dir build -R p_sfc_particle_domain --output-on-failure
 
 ## Test inputs and generated outputs
 
+See [tree correctness tests](docs/tree_correctness.md) for local CPU/GPU tests,
+independent Python references, conservation checks, and edge cases.
+
 Both Slurm test runners use `pepc_shape` and the bundled 10,000-particle snapshot.
 The default mode is `strong`, since the input file has a fixed particle count.
 Run from the project root with the cluster modules, Python dependencies, account,

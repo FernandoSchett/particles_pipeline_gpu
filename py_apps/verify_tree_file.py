@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import struct
 import sys
+from tree_reference import read_particles, check_conservation, check_cpu_particles
 
 MAGIC = b"PSFCTREE"
 VERSION = 1
@@ -59,6 +60,8 @@ def read_tree_file(path):
         if version != VERSION:
             raise ValueError(f"unsupported version: {version}")
 
+        if tree_count < 1:
+            raise ValueError("tree file must contain at least one rank")
         trees = []
         for tree_index in range(tree_count):
             owner, particle_count, node_count = SECTION_HEADER.unpack(
@@ -102,6 +105,8 @@ def validate_tree(owner, particle_count, total_particles, nodes, max_depth):
     root = nodes[0]
     if (root.key, root.level, root.parent) != (1, 0, -1):
         raise ValueError(f"rank {owner}: invalid root topology")
+    if root.next_sibling != -1:
+        raise ValueError(f"rank {owner}: root has a sibling")
     if root.owner != -1 or root.is_branch or root.is_remote:
         raise ValueError(f"rank {owner}: root is not a global fill node")
     if root.particle_count != total_particles:
@@ -142,6 +147,12 @@ def validate_tree(owner, particle_count, total_particles, nodes, max_depth):
         elif node.owner != owner or node.is_remote or not node.children_available:
             raise ValueError(f"rank {owner}: invalid local subtree node {index}")
 
+        if node.flags & ~15 or node.child_mask & ~255:
+            raise ValueError(f"rank {owner}: node {index} has unknown flags")
+        if node.first_child < -1 or node.next_sibling < -1:
+            raise ValueError(f"rank {owner}: node {index} has invalid link sentinel")
+        if node.is_remote and node.next_sibling >= len(nodes):
+            raise ValueError(f"rank {owner}: invalid remote sibling index")
         children = child_indices(nodes, index)
         if node.is_leaf and not node.is_remote:
             if children or node.child_mask:
@@ -154,6 +165,8 @@ def validate_tree(owner, particle_count, total_particles, nodes, max_depth):
         expected_begin = node.particle_begin
         for child_index in children:
             child = nodes[child_index]
+            if child_index in referenced_children:
+                raise ValueError(f"rank {owner}: child {child_index} referenced more than once")
             referenced_children.add(child_index)
             if child.parent != index:
                 raise ValueError(f"rank {owner}: child {child_index} points to parent {child.parent}, expected {index}")
@@ -209,7 +222,15 @@ def main():
     parser = argparse.ArgumentParser(description="Validate distributed hashed oct-trees stored in a .tree file")
     parser.add_argument("treefile", type=Path)
     parser.add_argument("--max-depth", type=int, default=15)
+    parser.add_argument("--particles", type=Path, help="matching .par file for independent tree/particle checks")
+    source = parser.add_mutually_exclusive_group()
+    source.add_argument("--input-pepc", type=Path, help="original PEPC file for conservation and coordinate/key checks")
+    source.add_argument("--before-par", type=Path, help="particle dump before MPI redistribution")
     args = parser.parse_args()
+    if (args.input_pepc or args.before_par) and not args.particles:
+        parser.error("conservation checks require --particles")
+    if not 1 <= args.max_depth <= 20:
+        parser.error("--max-depth must be between 1 and 20")
 
     try:
         total_particles, trees = read_tree_file(args.treefile)
@@ -236,6 +257,11 @@ def main():
             )
         if any(signature != global_signatures[0] for signature in global_signatures[1:]):
             raise ValueError("global root/fill/branch topology differs between ranks")
+        if args.particles:
+            particles = read_particles(args.particles)
+            check_conservation(particles, args.before_par, args.input_pepc, args.max_depth)
+            check_cpu_particles(total_particles, trees, particles, args.max_depth)
+            print("CPU particle intervals, ownership, remote branches and recursive reference: OK")
     except (OSError, ValueError, struct.error) as error:
         print(f"FAIL: {error}", file=sys.stderr)
         return 1

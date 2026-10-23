@@ -56,3 +56,16 @@ for dist in "${DISTS[@]}"; do
     done
   done
 done
+
+# Exercise small adversarial inputs with the real binary in the same allocation.
+if [[ "${RUN_EDGE_CASES:-1}" == 1 ]]; then
+    edge_np=$(( MAX_NP < 4 ? MAX_NP : 4 ))
+    edge_nodes=$(( (edge_np + CPU_PER_NODE - 1) / CPU_PER_NODE ))
+    edge_tasks=$(( edge_np < CPU_PER_NODE ? edge_np : CPU_PER_NODE ))
+    "${PYTHON:-python3}" "$PROJECT_ROOT/py_apps/run_tree_correctness.py" \
+        --device cpu --executable "$PROJECT_ROOT/build/src/p_sfc_exe" \
+        --ranks "$edge_np" --launcher srun --rank-flag=-n \
+        --launcher-arg="--nodes=$edge_nodes" --launcher-arg="--ntasks-per-node=$edge_tasks" \
+        --launcher-arg=--cpus-per-task=1 \
+        --output-dir "$P_SFC_OUTPUT_DIR/edge_cases"
+fi

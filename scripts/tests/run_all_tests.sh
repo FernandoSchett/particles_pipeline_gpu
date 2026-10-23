@@ -13,6 +13,7 @@ export INPUT_FILE="${INPUT_FILE:-$PROJECT_ROOT/results/particles/mpi/particle_00
 INPUT_FILE="$(realpath "$INPUT_FILE")"
 [[ -r "$INPUT_FILE" ]] || { echo "Cannot read input: $INPUT_FILE" >&2; exit 1; }
 "$PYTHON" -c 'import numpy'
+"$PYTHON" -m unittest discover -s "$PROJECT_ROOT/py_apps/tests" -v
 cd "$PROJECT_ROOT"
 
 cd "$SCRIPTS_DIR"
@@ -50,7 +51,8 @@ if ((${#tree_files[@]} == 0)); then
 else
     echo "[INFO] Verifying ${#tree_files[@]} CPU tree files"
     for tree_file in "${tree_files[@]}"; do
-        if ! "$PYTHON" "$PROJECT_ROOT/py_apps/verify_tree_file.py" "$tree_file"; then
+        name="${tree_file##*/tree_file_cpu_}"
+        if ! "$PYTHON" "$PROJECT_ROOT/py_apps/verify_tree_file.py" "$tree_file" --particles "$P_SFC_OUTPUT_DIR/particle_file_cpu_${name%.tree}.par" --input-pepc "$INPUT_FILE"; then
             verification_failed=1
         fi
     done
@@ -63,7 +65,8 @@ if ((${#global_tree_files[@]} == 0)); then
 else
     echo "[INFO] Verifying ${#global_tree_files[@]} GPU global tree files"
     for tree_file in "${global_tree_files[@]}"; do
-        if ! "$PYTHON" "$PROJECT_ROOT/py_apps/verify_global_tree_file.py" "$tree_file"; then
+        name="${tree_file##*/tree_file_gpu_}"
+        if ! "$PYTHON" "$PROJECT_ROOT/py_apps/verify_global_tree_file.py" "$tree_file" --particles "$P_SFC_OUTPUT_DIR/particle_file_gpu_${name%.gtree}.par" --input-pepc "$INPUT_FILE"; then
             verification_failed=1
         fi
     done
