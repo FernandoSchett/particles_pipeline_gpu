@@ -51,6 +51,8 @@ particles_pipeline_gpu/
 │   ├── structure.md            # This directory map
 │   └── tree_construction.pdf   # Tree construction reference
 ├── results/
+│   ├── debug/                 # Direct-run particle/tree files and timing CSVs (generated)
+│   ├── tests/                 # Slurm test outputs (generated)
 │   ├── strong/                # Strong-scaling figures
 │   ├── weak/                  # Weak-scaling figures
 │   └── particles/mpi/          # PEPC input snapshot and parameter file
@@ -66,9 +68,9 @@ particles_pipeline_gpu/
 - `build/src/gpu_mpi_p_sfc_exe`: GPU executable, enabled by `P_SFC_BUILD_GPU`.
 - `libs/common/tests/` and `libs/cpu/tests/`: C++ tests registered with CTest when `BUILD_TESTING` is enabled.
 - `scripts/tests/`: cluster execution scripts; these also run Python validators on generated files.
-- `.par`, `.tree`, and `.gtree`: particle, CPU tree, and GPU tree debug outputs written to the execution directory.
-- `visualise.py` searches the project root, `build/`, and the current working directory for `particle_file*.par`.
-- `results_strong.csv` and `results_weak.csv`: timing logs written one directory above the execution directory. `gen_results.py` expects them in the project root.
+- `.par`, `.tree`, and `.gtree`: particle, CPU tree, and GPU tree outputs written under `results/debug/` by default, or `P_SFC_OUTPUT_DIR`. Slurm tests use `results/tests/`.
+- `visualise.py` searches the project root, `build/`, the current working directory, `results/debug/`, `results/tests/`, and `P_SFC_OUTPUT_DIR` for `particle_file*.par`.
+- `results_strong.csv` and `results_weak.csv`: timing logs written in the output directory. `gen_results.py` defaults to `results/debug/` and accepts `--csv-dir`.
 - `results/particles/mpi/particle_000000000001.mpi`: bundled PEPC snapshot with 10,000 particles. Its `.mpi.h` companion contains PEPC parameters in text form, not a C++ header.
 
 The shared implementation lives in `libs/common/`; CPU and GPU algorithms live in their respective libraries. The obsolete `libs/helper/` directory has been removed.

@@ -17,6 +17,9 @@ void print_pepc_particles(t_pepc_particle *particle_array, int size, int rank);
 
 void setup_particles_box_length(ExecConfig &cfg);
 
+/** @brief Create the output directory collectively; P_SFC_OUTPUT_DIR overrides the default. */
+void setup_output_directory(ExecConfig &cfg);
+
 void log_results(const ExecConfig &cfg, const exec_times &times, const char *results_path);
 
 static inline bool key_less(const t_particle &a, const t_particle &b);

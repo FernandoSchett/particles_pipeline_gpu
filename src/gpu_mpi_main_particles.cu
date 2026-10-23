@@ -76,6 +76,7 @@ int main(int argc, char **argv)
     MPI_Comm_size(MPI_COMM_WORLD, &cfg.nprocs);
     cfg.device = "gpu";
     parse_args(argc, argv, cfg);
+    setup_output_directory(cfg);
 
     int gpus = 0;
     cudaGetDeviceCount(&gpus);
@@ -197,8 +198,9 @@ int main(int argc, char **argv)
             std::snprintf(tree_filename, sizeof(tree_filename),
                           "tree_file_gpu_n%d_total%lld.gtree",
                           cfg.nprocs, cfg.total_particles);
+            const std::string tree_output = std::string(cfg.output_dir) + "/" + tree_filename;
             const int tree_write_status = write_global_distributed_octree_gpu(
-                global_tree, d_rank_array, cfg.length_per_rank, tree_filename,
+                global_tree, d_rank_array, cfg.length_per_rank, tree_output.c_str(),
                 gpu_stream, MPI_COMM_WORLD);
             if (tree_write_status != 0)
             {
@@ -218,7 +220,7 @@ int main(int argc, char **argv)
         times.total_time = tree_end - t0;
 
         const char *mode_str = (cfg.exp_type == WEAK_SCALING) ? "weak" : "strong";
-        std::string out = std::string("../results_") + mode_str + ".csv";
+        std::string out = (std::string(cfg.output_dir) + "/results_") + mode_str + ".csv";
         log_results(cfg, times, out.c_str());
     }
 

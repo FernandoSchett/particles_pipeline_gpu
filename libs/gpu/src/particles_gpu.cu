@@ -635,7 +635,7 @@ void redistribute_by_splitters_gpu(t_particle **d_rank_array, int *lens, int *ca
 
 /**
  * @brief Gather particle records and write a small debug .par file on rank zero.
- * @details Output is written in the working directory only when cfg.power < 4.
+ * @details Output is written under cfg.output_dir only when cfg.power < 4.
  * @pre All ranks in MPI_COMM_WORLD participate. MPI must accept CUDA device buffers.
  *
  * @param cfg Execution configuration, including rank count and output size.
@@ -703,8 +703,14 @@ void write_par_gpu(const ExecConfig &cfg,
             std::sprintf(filename, "particle_file_gpu_n%d_total%lld.par", cfg.nprocs, cfg.total_particles);
             std::vector<t_particle *> host_ptrs(cfg.nprocs, nullptr);
             for (int i = 0; i < cfg.nprocs; ++i)
+            {
                 host_ptrs[i] = reinterpret_cast<t_particle *>(gather_buf.data() + recv_displs[i]);
-            int rc = concat_and_serial_write(host_ptrs.data(), recv_lens.data(), cfg.nprocs, filename);
+                // Record current ownership, not the rank before redistribution.
+                for (int j = 0; j < recv_lens[i]; ++j)
+                    host_ptrs[i][j].mpi_rank = i;
+            }
+            const std::string output = std::string(cfg.output_dir) + "/" + filename;
+            int rc = concat_and_serial_write(host_ptrs.data(), recv_lens.data(), cfg.nprocs, output.c_str());
             if (rc != 0)
             {
                 std::cerr << "Error at writing file, rc=" << rc << "\n";

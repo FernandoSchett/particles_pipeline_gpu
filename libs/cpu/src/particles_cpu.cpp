@@ -1,4 +1,5 @@
 #include "particles_cpu.hpp"
+#include "particle_domain.hpp"
 
 #include <cstdlib>
 
@@ -96,12 +97,37 @@ int torus_distribution(t_particle **particle_array, int count, double major_r, d
     return 0;
 }
 
-int generate_particles_keys(t_particle *particle_array, int count, double box_length)
+int pepc_distribution_cpu(t_particle **particles, ExecConfig &cfg, MPI_Comm comm)
+{
+    t_pepc_particle *input = nullptr;
+    int64_t total = 0, local = 0;
+    const int status = parallel_read_pepc_particles(comm, &input, cfg.input_file, &total, &local);
+    if (status != 0)
+        return status;
+    if (local > std::numeric_limits<int>::max())
+        MPI_Abort(comm, 1);
+    std::free(*particles);
+    pepc_to_simple_particle_array(cfg.rank, &input, particles, local);
+    std::free(input);
+    MPI_Type_free(&MPI_particle_pepc);
+    MPI_Type_free(&MPI_particle_data);
+    MPI_Type_free(&MPI_particle_results);
+    cfg.total_particles = total;
+    cfg.length_per_rank = static_cast<int>(local);
+    cfg.ram_gb = local * static_cast<double>(sizeof(t_particle)) / 1e9;
+    return fit_particle_domain(*particles, local, cfg, comm);
+}
+
+int generate_particles_keys(t_particle *particle_array, int count, double box_length,
+                            double domain_x, double domain_y, double domain_z)
 {
 #pragma omp parallel for schedule(static)
     for (int i = 0; i < count; ++i)
     {
         t_particle &particle = particle_array[i];
+        const double x = particle.coord[0] - domain_x;
+        const double y = particle.coord[1] - domain_y;
+        const double z = particle.coord[2] - domain_z;
         double origin_x = 0.0;
         double origin_y = 0.0;
         double origin_z = 0.0;
@@ -113,11 +139,11 @@ int generate_particles_keys(t_particle *particle_array, int count, double box_le
             const double half = cell_size * 0.5;
             int octant = 0;
 
-            if (particle.coord[0] >= origin_x + half)
+            if (x >= origin_x + half)
                 octant |= 1;
-            if (particle.coord[1] >= origin_y + half)
+            if (y >= origin_y + half)
                 octant |= 2;
-            if (particle.coord[2] >= origin_z + half)
+            if (z >= origin_z + half)
                 octant |= 4;
 
             key = (key << 3) | static_cast<unsigned long long>(octant);
@@ -406,5 +432,6 @@ void write_par_cpu(const ExecConfig &cfg,
     char filename[128];
     std::sprintf(filename, "particle_file_cpu_n%d_total%lld.par", cfg.nprocs, cfg.total_particles);
     MPI_Allgather(&cfg.length_per_rank, 1, MPI_INT, length_vector, 1, MPI_INT, MPI_COMM_WORLD);
-    parallel_write_to_file(rank_array, length_vector, filename);
+    std::string output = std::string(cfg.output_dir) + "/" + filename;
+    parallel_write_to_file(rank_array, length_vector, output.data());
 }

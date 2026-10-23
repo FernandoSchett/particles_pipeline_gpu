@@ -82,6 +82,7 @@ typedef struct
   exp_alg_dist alg_type;
   const char *device;
   const char *input_file = nullptr;
+  const char *output_dir = "results/debug";
   double box_length;
   double box_origin[3] = {0.0, 0.0, 0.0};
   int major_r;

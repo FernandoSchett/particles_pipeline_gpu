@@ -20,6 +20,7 @@ void parse_args(int argc, char **argv, ExecConfig &cfg)
     cfg.dist_type = DIST_UNKNOWN;
     cfg.exp_type = STRONG_SCALING;
     cfg.alg_type = GLOBAL_SORTING;
+    cfg.input_file = argc > 6 ? argv[6] : "results/particles/mpi/particle_000000000001.mpi";
 
     if (argc > 1)
     {
@@ -27,6 +28,8 @@ void parse_args(int argc, char **argv, ExecConfig &cfg)
             cfg.dist_type = DIST_BOX;
         else if (strcmp(argv[1], "torus") == 0)
             cfg.dist_type = DIST_TORUS;
+        else if (strcmp(argv[1], "pepc_shape") == 0)
+            cfg.dist_type = DIST_PEPC;
         else if (strcmp(argv[1], "triangle") == 0)
             cfg.dist_type = DIST_TRIANGLE;
     }
@@ -55,10 +58,12 @@ void parse_args(int argc, char **argv, ExecConfig &cfg)
 
 namespace
 {
-int generate_particle_coordinates(const ExecConfig &cfg, t_particle **particles)
+int generate_particle_coordinates(ExecConfig &cfg, t_particle **particles)
 {
     switch (cfg.dist_type)
     {
+    case DIST_PEPC:
+        return pepc_distribution_cpu(particles, cfg, MPI_COMM_WORLD);
     case DIST_BOX:
         return box_distribution(
             particles, cfg.length_per_rank, cfg.box_length, cfg.seed + cfg.rank);
@@ -137,8 +142,9 @@ int write_small_debug_outputs(
     std::snprintf(tree_filename, sizeof(tree_filename),
                   "tree_file_cpu_n%d_total%lld.tree",
                   cfg.nprocs, cfg.total_particles);
+    const std::string output = std::string(cfg.output_dir) + "/" + tree_filename;
     return write_hashed_octree_file(
-        distributed_tree, cfg, tree_filename, MPI_COMM_WORLD);
+        distributed_tree, cfg, output.c_str(), MPI_COMM_WORLD);
 }
 
 void record_execution_times(
@@ -164,7 +170,7 @@ void record_execution_times(
     times.total_time = tree_end - generation_start;
 
     const char *mode = cfg.exp_type == WEAK_SCALING ? "weak" : "strong";
-    const std::string output = std::string("../results_") + mode + ".csv";
+    const std::string output = (std::string(cfg.output_dir) + "/results_") + mode + ".csv";
     log_results(cfg, times, output.c_str());
 }
 }
@@ -179,6 +185,7 @@ int main(int argc, char **argv)
     MPI_Comm_size(MPI_COMM_WORLD, &cfg.nprocs);
     cfg.device = "cpu";
     parse_args(argc, argv, cfg);
+    setup_output_directory(cfg);
 
     register_MPI_Particle(&MPI_particle);
     setup_particles_box_length(cfg);
@@ -197,11 +204,14 @@ int main(int argc, char **argv)
     MPI_Barrier(MPI_COMM_WORLD);
     const double allocation_end = MPI_Wtime();
 
-    generate_particle_coordinates(cfg, &particles);
+    const int input_status = generate_particle_coordinates(cfg, &particles);
+    if (input_status != 0)
+        MPI_Abort(MPI_COMM_WORLD, input_status);
 
     MPI_Barrier(MPI_COMM_WORLD);
     const double generation_start = MPI_Wtime();
-    generate_particles_keys(particles, cfg.length_per_rank, cfg.box_length);
+    generate_particles_keys(particles, cfg.length_per_rank, cfg.box_length,
+                            cfg.box_origin[0], cfg.box_origin[1], cfg.box_origin[2]);
 
     MPI_Barrier(MPI_COMM_WORLD);
     const double generation_end = MPI_Wtime();
