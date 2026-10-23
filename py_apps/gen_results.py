@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
 import math
+import argparse
+import os
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 BASE_RESULTS_DIR = PROJECT_ROOT / "results"
@@ -352,5 +354,9 @@ def run_all(csv_file, prefix):
 
 # %%
 if __name__ == "__main__":
-    run_all(PROJECT_ROOT / "results_weak.csv", "weak")
-    run_all(PROJECT_ROOT / "results_strong.csv", "strong")
+    parser = argparse.ArgumentParser(description="Generate scaling plots from timing CSVs")
+    parser.add_argument("--csv-dir", type=Path,
+                        default=Path(os.environ.get("P_SFC_OUTPUT_DIR", PROJECT_ROOT / "results" / "debug")))
+    args = parser.parse_args()
+    run_all(args.csv_dir / "results_weak.csv", "weak")
+    run_all(args.csv_dir / "results_strong.csv", "strong")

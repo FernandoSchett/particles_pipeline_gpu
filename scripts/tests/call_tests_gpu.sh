@@ -9,9 +9,9 @@ TIME="${GPU_TIME:-00:20:00}"
 MAX_NP="${GPU_MAX_NP:-8}"
 GPU_PER_NODE="${GPU_PER_NODE:-4}"
 NODES=$(( (MAX_NP + GPU_PER_NODE - 1) / GPU_PER_NODE ))
+TASKS_PER_NODE=$(( MAX_NP < GPU_PER_NODE ? MAX_NP : GPU_PER_NODE ))
 export GPU_PER_NODE
 
-rm -f ./particle_file_gpu_*.par ./tree_file_gpu_*.gtree ./tree_file_gpu_*.png core.* || true
 
 echo "[INFO] salloc partition=$PARTITION account=$ACCOUNT time=$TIME GPUs=$MAX_NP nodes=$NODES"
 salloc \
@@ -20,6 +20,6 @@ salloc \
   --time="$TIME" \
   --nodes="$NODES" \
   --ntasks="$MAX_NP" \
-  --ntasks-per-node="$GPU_PER_NODE" \
+  --ntasks-per-node="$TASKS_PER_NODE" \
   --gpus-per-task=1 \
   bash -lc "bash ./run_tests_gpu.sh"

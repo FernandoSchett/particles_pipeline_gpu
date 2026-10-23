@@ -45,7 +45,11 @@ def main():
     ap = argparse.ArgumentParser(description="Check per-rank ordering and load balance in .par files")
     ap.add_argument("parfiles", nargs="+", type=Path, help="paths to .par files")
     ap.add_argument("--tol", type=int, default=2, help="allowed imbalance (max particle count difference)")
+    ap.add_argument("--key-partitions", type=int, metavar="RANKS",
+                    help="verify exact quantile partitions, keeping equal Morton keys together")
     args = ap.parse_args()
+    if args.key_partitions is not None and args.key_partitions < 1:
+        ap.error("--key-partitions must be positive")
 
     exit_code = 0
     for index, parfile in enumerate(args.parfiles):
@@ -66,6 +70,20 @@ def main():
 
         per_rank_sorted = check_sorted_per_rank(data)
         balanced, counts_map, cmin, cmax = check_balance(data, args.tol)
+        if args.key_partitions is not None:
+            # Each splitter is the first key reaching ceil(N * rank / ranks).
+            # upper_bound retains every occurrence of that key on the left.
+            ranks = args.key_partitions
+            keys = np.sort(data["key"])
+            if keys.size:
+                targets = [(keys.size * rank + ranks - 1) // ranks for rank in range(1, ranks)]
+                splitters = keys[np.asarray(targets, dtype=np.int64) - 1]
+                expected_owner = np.searchsorted(splitters, data["key"], side="left")
+                balanced = bool(np.all(data["rank"] == expected_owner))
+            else:
+                balanced = False
+            counts_map = {rank: counts_map.get(rank, 0) for rank in range(ranks)}
+            cmin, cmax = min(counts_map.values()), max(counts_map.values())
 
         print(f"File: {parfile.name}")
         print("Ordering per rank (keys non-decreasing):")
@@ -74,7 +92,10 @@ def main():
             print(f"  rank {r:4d}: {status}")
 
         print("\nLoad balance:")
-        print(f"  tolerance = {args.tol}")
+        if args.key_partitions is None:
+            print(f"  tolerance = {args.tol}")
+        else:
+            print(f"  checking exact Morton quantile partitions across {args.key_partitions} ranks")
         print(f"  min={cmin}  max={cmax}  diff={cmax - cmin}  -> {'OK' if balanced else 'FAIL'}")
         print("  particle counts per rank:")
         for r in sorted(counts_map):

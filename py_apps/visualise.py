@@ -3,6 +3,7 @@ import struct
 import matplotlib.pyplot as plt
 from matplotlib.widgets import CheckButtons
 from pathlib import Path
+import os
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 BUILD_DIR = PROJECT_ROOT / "build"
@@ -28,7 +29,10 @@ def read_binary(filename):
 
     return particle_count, rank_array, coord_array
 
-search_dirs = {Path.cwd().resolve(), PROJECT_ROOT, BUILD_DIR}
+search_dirs = {Path.cwd().resolve(), PROJECT_ROOT, BUILD_DIR,
+               PROJECT_ROOT / "results" / "debug", PROJECT_ROOT / "results" / "tests"}
+if os.environ.get("P_SFC_OUTPUT_DIR"):
+    search_dirs.add(Path(os.environ["P_SFC_OUTPUT_DIR"]).resolve())
 particle_files = sorted({
     path.resolve()
     for directory in search_dirs
