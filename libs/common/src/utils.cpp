@@ -1,4 +1,5 @@
 #include "utils.hpp"
+#include "particle_domain.hpp"
 #include <cstdio>
 #include <ctime>
 #include <sys/stat.h>
@@ -37,6 +38,38 @@ void print_pepc_particles(t_pepc_particle *particle_array, int size, int rank)
 
         printf("\n");
     }
+}
+
+int fit_particle_domain(const t_particle *particles, int64_t count,
+                        ExecConfig &cfg, MPI_Comm comm)
+{
+    const double infinity = std::numeric_limits<double>::infinity();
+    double lower[3] = {infinity, infinity, infinity};
+    double upper[3] = {-infinity, -infinity, -infinity};
+    int invalid = 0;
+    for (int64_t i = 0; i < count; ++i)
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            const double value = particles[i].coord[axis];
+            invalid |= !std::isfinite(value);
+            lower[axis] = std::min(lower[axis], value);
+            upper[axis] = std::max(upper[axis], value);
+        }
+    MPI_Allreduce(MPI_IN_PLACE, &invalid, 1, MPI_INT, MPI_MAX, comm);
+    if (invalid)
+        return 1;
+    MPI_Allreduce(MPI_IN_PLACE, lower, 3, MPI_DOUBLE, MPI_MIN, comm);
+    MPI_Allreduce(MPI_IN_PLACE, upper, 3, MPI_DOUBLE, MPI_MAX, comm);
+    double length = 0.0;
+    for (int axis = 0; axis < 3; ++axis)
+    {
+        cfg.box_origin[axis] = lower[axis] == infinity ? 0.0 : lower[axis];
+        if (lower[axis] != infinity)
+            length = std::max(length, upper[axis] - lower[axis]);
+    }
+    // Empty and coincident particle sets still need a positive domain size.
+    cfg.box_length = length == 0.0 ? 1.0 : std::nextafter(length, infinity);
+    return std::isfinite(cfg.box_length) ? 0 : 1;
 }
 
 void setup_particles_box_length(ExecConfig &cfg)

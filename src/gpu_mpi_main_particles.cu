@@ -27,6 +27,7 @@ void parse_args(int argc, char **argv, ExecConfig &cfg)
     cfg.dist_type = DIST_UNKNOWN;
     cfg.exp_type = STRONG_SCALING;
     cfg.alg_type = GLOBAL_SORTING;
+    cfg.input_file = argc > 6 ? argv[6] : "results/particles/mpi/particle_000000000001.mpi";
 
     if (argc > 1)
     {
@@ -101,7 +102,7 @@ int main(int argc, char **argv)
     cudaDeviceGetAttribute(&sms, cudaDevAttrMultiProcessorCount, local_dev);
     const int block = 256;
     int maxBlocks = sms * 20;
-    int grid = (cfg.length_per_rank + block - 1) / block;
+    int grid = std::max(1, (cfg.length_per_rank + block - 1) / block);
     if (grid > maxBlocks)
         grid = maxBlocks;
 
@@ -119,27 +120,24 @@ int main(int argc, char **argv)
         torus_distribution_kernel<<<grid, block, 0, gpu_stream>>>(d_rank_array, cfg.length_per_rank, cfg.major_r, cfg.minor_r, cfg.box_length, cfg.seed + cfg.rank);
         break;
     case DIST_PEPC:
-        pepc_distribution(MPI_COMM_WORLD, "./particles/mpi/particle_000000000001.mpi", &d_rank_array, &n_total, &n_local, cfg, gpu_stream);
-        cfg.length_per_rank = (int)n_local;
-        capacity = cfg.length_per_rank;
-/*
-        maxBlocks = sms * 20;
-        grid = (cfg.length_per_rank + block - 1) / block;
-        if (grid > maxBlocks)
-            grid = maxBlocks;
-
-        print_particle_gpu<<<grid, block>>>(d_rank_array, n_local, cfg.rank);
-*/
+        pepc_distribution(MPI_COMM_WORLD, cfg.input_file, &d_rank_array, &n_total, &n_local, cfg, gpu_stream);
         break;
     default:
         break;
     }
 
+    capacity = cfg.length_per_rank;
+    grid = std::max(1, static_cast<int>((static_cast<int64_t>(cfg.length_per_rank) + block - 1) / block));
+    if (grid > maxBlocks)
+        grid = maxBlocks;
+
     cudaStreamSynchronize(gpu_stream);
     MPI_Barrier(MPI_COMM_WORLD);
 
     t0 = MPI_Wtime();
-    generate_keys_kernel<<<grid, block, 0, gpu_stream>>>(d_rank_array, cfg.length_per_rank, cfg.box_length);
+    generate_keys_kernel<<<grid, block, 0, gpu_stream>>>(
+        d_rank_array, cfg.length_per_rank, cfg.box_length,
+        cfg.box_origin[0], cfg.box_origin[1], cfg.box_origin[2]);
 
     cudaStreamSynchronize(gpu_stream);
     MPI_Barrier(MPI_COMM_WORLD);

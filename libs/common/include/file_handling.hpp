@@ -34,7 +34,7 @@ int register_MPI_particle_results(MPI_Datatype *MPI_Particle_results);
 int register_MPI_Particle_pepc(MPI_Datatype *MPI_Particle_pepc);
 
 int parallel_read_pepc_particles(MPI_Comm comm, t_pepc_particle **pepc_array, \
-                             char *filename, int64_t *n_total, int64_t *n_local);
+                             const char *filename, int64_t *n_total, int64_t *n_local);
 
 void pepc_to_simple_particle_array(int rank, t_pepc_particle **pepc_array, t_particle **particle_array, int64_t n_local);
 

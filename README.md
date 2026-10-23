@@ -35,6 +35,29 @@
 
          sh scripts/run_all_jobs.sh 
 
+## PEPC input on GPU
+
+From the project root, use the bundled PEPC snapshot or pass another file as the
+last argument:
+
+```bash
+mpirun -np 1 ./build/src/gpu_mpi_p_sfc_exe pepc_shape 3 67 strong table results/particles/mpi/particle_000000000001.mpi
+```
+
+The reader supplies the actual particle count. All MPI ranks share a cubic
+Morton domain computed from the global coordinate minima and largest axis span.
+Key generation subtracts the domain origin without changing the stored physical
+coordinates. Existing PEPC keys are replaced with this pipeline's Morton keys.
+The bundled snapshot has 10,000 particles, regardless of the `power` argument;
+`power < 4` still enables debug particle and tree output. A fixed input snapshot
+does not grow with the process count when `weak` is selected.
+
+Run the domain checks, including the bundled snapshot, with:
+
+```bash
+ctest --test-dir build -R p_sfc_particle_domain --output-on-failure
+```
+
 ## Dependencies:
 
     - MPI

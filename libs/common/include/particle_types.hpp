@@ -81,7 +81,9 @@ typedef struct
   exp_type_t exp_type;
   exp_alg_dist alg_type;
   const char *device;
+  const char *input_file = nullptr;
   double box_length;
+  double box_origin[3] = {0.0, 0.0, 0.0};
   int major_r;
   int minor_r;
   long long total_particles;

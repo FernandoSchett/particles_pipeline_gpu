@@ -12,6 +12,7 @@
  * The executable skips splitter discovery for a single rank when no tree is requested.
  */
 #include "particles_gpu.hcu"
+#include "particle_domain.hpp"
 
 // GPU particle generation and redistribution.
 
@@ -134,19 +135,23 @@ __global__ void torus_distribution_kernel(t_particle *particles, int N, double m
 /**
  * @brief Calculate Morton keys (Z-order curve) from particle coordinates.
  * @details Each of MAX_DEPTH levels contributes three bits: x, y, then z.
- * @pre Coordinates lie inside the domain starting at the origin.
+ * @pre Coordinates lie inside the specified cubic domain.
  *
  * @param particles Device array; coordinates are read and key fields are written.
  * @param N Number of local particles.
  * @param box_length Side length of the coordinate domain.
+ * @param origin_x Global minimum x coordinate of the domain.
+ * @param origin_y Global minimum y coordinate of the domain.
+ * @param origin_z Global minimum z coordinate of the domain.
  */
-__global__ void generate_keys_kernel(t_particle *particles, int N, double box_length)
+__global__ void generate_keys_kernel(t_particle *particles, int N, double box_length,
+                                     double origin_x, double origin_y, double origin_z)
 {
     for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < N; i += blockDim.x * gridDim.x)
     {
-        double x = particles[i].coord[0];
-        double y = particles[i].coord[1];
-        double z = particles[i].coord[2];
+        double x = particles[i].coord[0] - origin_x;
+        double y = particles[i].coord[1] - origin_y;
+        double z = particles[i].coord[2] - origin_z;
 
         double ox = 0.0, oy = 0.0, oz = 0.0;
         double len = box_length;
@@ -224,30 +229,52 @@ __global__ void print_particle_gpu(t_particle *p, int n, int rank_id)
  * @param filename Filename of the PEPC particles file (in).
  * @param device_array Array that will be populated with PEPC particle coordinates (inout).
  * @param n_total Global particles count (out).
- * @param n_total Particles count per device (out).
- * @param cfg Simulation configurations (in).
+ * @param n_local Particles count per device (out).
+ * @param cfg Configuration receiving actual counts and the global coordinate domain.
  * @param stream CUDA gpu stream for potential async operations(in).
  */
-void pepc_distribution(MPI_Comm comm, char *filename, t_particle **device_array, int64_t *n_total, int64_t *n_local, ExecConfig cfg, cudaStream_t stream)
+void pepc_distribution(MPI_Comm comm, const char *filename, t_particle **device_array, int64_t *n_total, int64_t *n_local, ExecConfig &cfg, cudaStream_t stream)
 {
     t_pepc_particle *pepc_array;
     t_particle *particle_array;
     int64_t temp_total, temp_local;
 
     cudaFree(*device_array);
-    parallel_read_pepc_particles(comm, &pepc_array, filename, &temp_total, &temp_local);
+    int read_status = parallel_read_pepc_particles(comm, &pepc_array, filename, &temp_total, &temp_local);
+    MPI_Allreduce(MPI_IN_PLACE, &read_status, 1, MPI_INT, MPI_MAX, comm);
+    if (read_status != 0)
+        MPI_Abort(comm, read_status);
+    if (temp_local > std::numeric_limits<int>::max())
+    {
+        std::fprintf(stderr, "PEPC local particle count exceeds INT_MAX.\n");
+        MPI_Abort(comm, 1);
+    }
 
     pepc_to_simple_particle_array(cfg.rank, &pepc_array, &particle_array, temp_local);
     free(pepc_array);
 
+    if (fit_particle_domain(particle_array, temp_local, cfg, comm) != 0)
+    {
+        std::fprintf(stderr, "PEPC coordinates do not define a finite Morton domain.\n");
+        MPI_Abort(comm, 1);
+    }
+    cfg.total_particles = temp_total;
+    cfg.length_per_rank = static_cast<int>(temp_local);
+    cfg.ram_gb = temp_local * static_cast<double>(sizeof(t_particle)) / 1e9;
+
     //printf("temp_local %lld\n ", temp_local);
     //printf("rank %d p_cpu[0].coords: %f %f %f\n", cfg.rank, particle_array[0].coord[0], particle_array[0].coord[1], particle_array[0].coord[2]);
-    cudaMalloc(device_array, (size_t)temp_local*sizeof(t_particle));
-    cudaMemcpy(*device_array, particle_array, (size_t)temp_local*sizeof(t_particle), cudaMemcpyHostToDevice);
+    CUDA_RT_CALL(cudaMalloc(device_array, std::max<size_t>(1, (size_t)temp_local*sizeof(t_particle))));
+    if (temp_local > 0)
+        CUDA_RT_CALL(cudaMemcpy(*device_array, particle_array, (size_t)temp_local*sizeof(t_particle), cudaMemcpyHostToDevice));
     free(particle_array);
 
     *n_total = temp_total;
     *n_local = temp_local;
+    if (cfg.rank == 0)
+        std::printf("PEPC: %lld particles, origin=(%.17g, %.17g, %.17g), side=%.17g\n",
+                    cfg.total_particles, cfg.box_origin[0], cfg.box_origin[1],
+                    cfg.box_origin[2], cfg.box_length);
 }
 
 /**
